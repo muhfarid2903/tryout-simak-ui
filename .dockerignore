@@ -1,0 +1,9 @@
+.git
+.claude
+.DS_Store
+deploy/setup-vps.sh
+deploy/update-vps.sh
+deploy/DEPLOY.md
+deploy/COOLIFY.md
+README.md
+tryout-simak-ui-HP.html

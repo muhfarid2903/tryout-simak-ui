@@ -1,0 +1,90 @@
+{
+  "packages": [
+    {
+      "id": "paket-contoh",
+      "name": "Contoh Tryout SIMAK UI — TPA & Bahasa Inggris",
+      "mode": "sections",
+      "durationMin": 90,
+      "sectionMinutes": {
+        "Kemampuan Verbal": 20,
+        "Kemampuan Kuantitatif": 25,
+        "Kemampuan Penalaran": 20,
+        "Bahasa Inggris": 30
+      },
+      "shuffleQuestions": true,
+      "shuffleOptions": true
+    }
+  ],
+  "questions": [
+    {
+      "packageId": "paket-contoh",
+      "subject": "Kemampuan Verbal",
+      "text": "Sinonim kata RELEVAN adalah ...",
+      "options": ["Bertautan", "Acuh", "Ragu", "Sepadan", "Berbeda"],
+      "answer": "A",
+      "pembahasan": "Relevan berarti berkaitan/bertautan dengan persoalan. Jawaban: A."
+    },
+    {
+      "packageId": "paket-contoh",
+      "subject": "Kemampuan Verbal",
+      "text": "GURU : MENGAJAR = PETANI : ...",
+      "options": ["Sawah", "Cangkul", "Bertani", "Padi", "Desa"],
+      "answer": "C",
+      "pembahasan": "Hubungan profesi : aktivitas utamanya. Guru mengajar, petani bertani. Jawaban: C."
+    },
+    {
+      "packageId": "paket-contoh",
+      "subject": "Kemampuan Kuantitatif",
+      "text": "Suku berikutnya dari deret 2, 5, 10, 17, ... adalah ...",
+      "options": ["24", "26", "28", "30", "32"],
+      "answer": 1,
+      "pembahasan": "Selisih bertambah ganjil: +3, +5, +7, +9 → 17 + 9 = 26. Jawaban: B."
+    },
+    {
+      "packageId": "paket-contoh",
+      "subject": "Kemampuan Kuantitatif",
+      "text": "Sebuah barang didiskon 20%, lalu didiskon lagi 10%. Total potongan dari harga awal adalah ...",
+      "options": ["28%", "30%", "26%", "25%", "32%"],
+      "answer": "A",
+      "pembahasan": "Harga akhir = 0,8 × 0,9 = 0,72 dari harga awal, jadi potongan total 28%. Bukan 30% (diskon tidak dijumlah langsung). Jawaban: A."
+    },
+    {
+      "packageId": "paket-contoh",
+      "subject": "Kemampuan Kuantitatif",
+      "text": "Hasil dari $\\frac{2}{3} + \\frac{1}{4}$ adalah ...",
+      "options": ["$\\frac{11}{12}$", "$\\frac{3}{7}$", "$\\frac{5}{6}$", "$\\frac{3}{4}$", "$1$"],
+      "answer": "A",
+      "pembahasan": "Samakan penyebut ke 12: $\\frac{2}{3}=\\frac{8}{12}$ dan $\\frac{1}{4}=\\frac{3}{12}$, sehingga $\\frac{8}{12}+\\frac{3}{12}=\\frac{11}{12}$. Jawaban: A."
+    },
+    {
+      "packageId": "paket-contoh",
+      "subject": "Kemampuan Penalaran",
+      "text": "Semua mahasiswa pascasarjana pernah lulus S1. Sebagian yang lulus S1 bekerja di rumah sakit. Kesimpulan yang PASTI benar adalah ...",
+      "options": [
+        "Semua mahasiswa pascasarjana bekerja di rumah sakit",
+        "Sebagian mahasiswa pascasarjana mungkin bekerja di rumah sakit",
+        "Semua yang bekerja di rumah sakit adalah mahasiswa pascasarjana",
+        "Tidak ada mahasiswa pascasarjana yang lulus S1",
+        "Semua yang lulus S1 adalah mahasiswa pascasarjana"
+      ],
+      "answer": "B",
+      "pembahasan": "Hanya B yang tidak melakukan overgeneralisasi terhadap premis. Jawaban: B."
+    },
+    {
+      "packageId": "paket-contoh",
+      "subject": "Bahasa Inggris",
+      "text": "There is ___ water left in the bottle, so we should refill it soon.\n\nChoose the best option.",
+      "options": ["little", "few", "a few", "many", "fewer"],
+      "answer": "A",
+      "pembahasan": "'Water' tak terhitung dan maknanya negatif (hampir habis), sehingga dipakai 'little'. Jawaban: A."
+    },
+    {
+      "packageId": "paket-contoh",
+      "subject": "Bahasa Inggris",
+      "text": "The results were not ___ with our hypothesis, so we revised the model.\n\nChoose the best word.",
+      "options": ["consist", "consistent", "consistence", "consisting", "consisted"],
+      "answer": 1,
+      "pembahasan": "'be consistent with' membutuhkan adjektiva 'consistent'. Jawaban: B."
+    }
+  ]
+}

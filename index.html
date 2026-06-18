@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tryout SIMAK UI Pascasarjana</title>
+  <script>
+    // Terapkan tema sedini mungkin agar tidak ada kedip (flash) saat memuat.
+    try {
+      var t = localStorage.getItem("tryout_simak_ui_theme");
+      if (t === "dark" || (!t && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches))
+        document.documentElement.setAttribute("data-theme", "dark");
+    } catch (e) {}
+  </script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">UI</span>
+      <div>
+        <h1>Tryout SIMAK UI Pascasarjana</h1>
+        <p class="tagline">Latihan soal S2/S3 mode ujian — offline</p>
+      </div>
+    </div>
+    <nav class="mainnav" id="mainnav">
+      <button class="navbtn active" data-view="home">Beranda</button>
+      <button class="navbtn" data-view="practice">Latihan</button>
+      <button class="navbtn" data-view="stats">Statistik</button>
+      <button class="navbtn" data-view="input">Input Soal</button>
+      <button class="navbtn" data-view="bank">Bank Soal</button>
+      <button class="navbtn" data-view="materi">Materi</button>
+      <button class="navbtn" data-view="achievements">Pencapaian</button>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" title="Ganti tema gelap/terang" aria-label="Ganti tema gelap/terang">🌙</button>
+  </header>
+
+  <main id="app"></main>
+
+  <!-- Templates rendered via JS into #app -->
+  <script src="app.js"></script>
+</body>
+</html>
