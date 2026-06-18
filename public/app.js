@@ -1,5 +1,5 @@
 /* =========================================================================
-   Tryout SIMAK UI Pascasarjana — aplikasi offline (vanilla JS + localStorage)
+   Tryout SIMAK UI Pascasarjana — aplikasi web (vanilla JS, akun & sinkron via API)
    Mendukung: mode waktu global / per mata uji (sesi terkunci),
               acak urutan soal & acak pilihan jawaban.
    ========================================================================= */

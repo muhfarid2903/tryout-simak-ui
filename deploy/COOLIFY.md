@@ -54,8 +54,7 @@ otomatis ter-deploy. Untuk update kode: edit lokal → `git push`.
 | `PGSSL` | tidak | Set `true` jika DB butuh SSL (umumnya tidak untuk DB internal Coolify). |
 
 ### Catatan data & keamanan
-- Frontend tetap **offline-first**: tanpa login pun jalan; data lokal (localStorage)
-  disinkronkan ke server saat login (prinsip *data terbaru menang*, dengan tombol
-  Tarik/Unggah manual di menu **Akun**).
+- **Wajib login**: konten (paket & soal) dikelola admin secara terpusat; progres tiap
+  user (rekor, statistik, bookmark) tersimpan & sinkron di semua perangkat.
 - Registrasi terbuka untuk siapa saja yang tahu URL. Bila ingin dibatasi
   (mis. hanya kamu), minta ditambahkan kunci registrasi / mematikan endpoint register.

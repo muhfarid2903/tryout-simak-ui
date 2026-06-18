@@ -1,6 +1,6 @@
-# Tryout SIMAK UI (Offline)
+# Tryout SIMAK UI
 
-Website latihan soal ala SIMAK UI yang berjalan **sepenuhnya offline** di browser. Tidak perlu internet, server, atau instalasi.
+Website latihan soal ala SIMAK UI Pascasarjana yang berjalan di browser — mode ujian, analitik, latihan adaptif, dengan akun & sinkron antar perangkat.
 
 ## Cara pakai
 Buka file **`index.html`** dengan klik dua kali (atau klik kanan → Open With → browser seperti Chrome/Safari/Edge).
