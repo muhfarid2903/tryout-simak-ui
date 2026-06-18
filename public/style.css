@@ -477,6 +477,16 @@ table.subj th { background: var(--surface-soft); }
   table.subj th, table.subj td { padding: 8px 8px; font-size: 13px; }
 }
 
+/* ---------- Peran & gating navigasi ---------- */
+.navbtn[data-view="input"], .navbtn[data-view="adminusers"] { display: none; }
+body.is-admin .navbtn[data-view="input"],
+body.is-admin .navbtn[data-view="adminusers"] { display: inline-flex; }
+body:not(.logged-in) .mainnav .navbtn:not([data-view="account"]) { display: none; }
+
+.role-badge { font-size: 11px; font-weight: 800; letter-spacing: .5px; padding: 2px 8px; border-radius: 6px; }
+.role-badge.admin { background: var(--chip-warm); color: var(--warm-ink); border: 1px solid var(--ui-yellow-dark); }
+.role-badge.user { background: var(--surface-mute); color: var(--ui-ink-soft); }
+
 /* ---------- Aksesibilitas: kurangi animasi ---------- */
 @media (prefers-reduced-motion: reduce) {
   .timer.danger { animation: none; }

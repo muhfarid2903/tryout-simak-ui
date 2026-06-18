@@ -794,12 +794,17 @@ let examTimer = null;
 let practiceState = null;
 let _activeQ = null, _tickStart = 0; // pelacakan waktu per soal saat ujian
 
-const NAV_VIEWS = ["home", "practice", "stats", "input", "bank", "materi", "achievements", "account"];
+const NAV_VIEWS = ["home", "practice", "stats", "input", "bank", "materi", "achievements", "adminusers", "account"];
+const ADMIN_VIEWS = ["input", "adminusers"];
 let currentView = "home";
 function setNav(view) {
   document.querySelectorAll(".navbtn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
 }
 function go(view, arg) {
+  // Wajib login: selain halaman akun, arahkan ke login bila belum masuk.
+  if (!isLoggedIn() && view !== "account") { currentView = "account"; setNav(""); window.scrollTo(0, 0); renderAccount(); return; }
+  // Halaman admin hanya untuk admin.
+  if (ADMIN_VIEWS.includes(view) && !isAdmin()) { toast("Khusus admin"); view = "home"; }
   currentView = view;
   setNav(NAV_VIEWS.includes(view) ? view : "");
   window.scrollTo(0, 0);
@@ -813,6 +818,7 @@ function go(view, arg) {
   else if (view === "exam") renderExam();
   else if (view === "result") renderResult(arg);
   else if (view === "account") renderAccount();
+  else if (view === "adminusers") renderAdminUsers();
 }
 document.getElementById("mainnav").addEventListener("click", e => {
   const btn = e.target.closest(".navbtn");
@@ -848,8 +854,10 @@ function renderHome() {
   root.appendChild(el("p", { class: "page-sub" }, "Pilih paket lalu kerjakan dalam mode ujian. Soal & pilihan diacak tiap kali diulang."));
 
   if (store.packages.length === 0) {
-    root.appendChild(emptyState("📦", "Belum ada paket tryout", "Buat paket dan soalnya di menu Input Soal.",
-      el("button", { class: "btn primary", onclick: () => go("input") }, "+ Buat Paket")));
+    root.appendChild(isAdmin()
+      ? emptyState("📦", "Belum ada paket tryout", "Buat paket dan soalnya di menu Input Soal.",
+          el("button", { class: "btn primary", onclick: () => go("input") }, "+ Buat Paket"))
+      : emptyState("📦", "Belum ada paket tryout", "Admin belum mengunggah paket soal. Cek lagi nanti ya."));
     return;
   }
 
@@ -872,7 +880,7 @@ function renderHome() {
       el("div", { class: "btn-row", style: "margin-top:auto" }, [
         el("button", { class: "btn primary", onclick: () => startExam(p.id), disabled: n === 0 ? "" : null },
           n === 0 ? "Belum ada soal" : "▶ Mulai Tryout"),
-        el("button", { class: "btn sm", onclick: () => go("input", p.id) }, "Edit"),
+        isAdmin() ? el("button", { class: "btn sm", onclick: () => go("input", p.id) }, "Edit") : null,
       ]),
     ]));
   });
@@ -2126,22 +2134,36 @@ document.addEventListener("keydown", e => {
    ========================================================================= */
 const TOKEN_KEY = "tryout_simak_ui_token";
 const EMAIL_KEY = "tryout_simak_ui_email";
-let pushTimer = null;
+const ROLE_KEY = "tryout_simak_ui_role";
+let progTimer = null, contentTimer = null;
 
 function authToken() { try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; } }
 function authEmail() { try { return localStorage.getItem(EMAIL_KEY); } catch (e) { return null; } }
+function authRole() { try { return localStorage.getItem(ROLE_KEY) || "user"; } catch (e) { return "user"; } }
 function isLoggedIn() { return !!authToken(); }
-function setAuth(token, email) {
-  try { localStorage.setItem(TOKEN_KEY, token); localStorage.setItem(EMAIL_KEY, email); } catch (e) { /* abaikan */ }
+function isAdmin() { return isLoggedIn() && authRole() === "admin"; }
+function setAuth(token, email, role) {
+  try { localStorage.setItem(TOKEN_KEY, token); localStorage.setItem(EMAIL_KEY, email); localStorage.setItem(ROLE_KEY, role || "user"); } catch (e) { /* abaikan */ }
   updateAccountNav();
 }
 function clearAuth() {
-  try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(EMAIL_KEY); } catch (e) { /* abaikan */ }
+  try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(EMAIL_KEY); localStorage.removeItem(ROLE_KEY); } catch (e) { /* abaikan */ }
   updateAccountNav();
 }
 function updateAccountNav() {
-  const btn = document.querySelector('.navbtn[data-view="account"]');
-  if (btn) btn.textContent = isLoggedIn() ? "👤 Akun" : "Masuk";
+  const acc = document.querySelector('.navbtn[data-view="account"]');
+  if (acc) acc.textContent = isLoggedIn() ? (isAdmin() ? "👤 Admin" : "👤 Akun") : "Masuk";
+  document.body.classList.toggle("logged-in", isLoggedIn());
+  document.body.classList.toggle("is-admin", isAdmin());
+}
+// Keluar dari akun: bersihkan token & cache lokal agar data pengguna tak tercampur.
+function doLogout(silent) {
+  clearAuth();
+  try { stopTimer(); } catch (e) { /* abaikan */ }
+  examState = null; try { clearExam(); } catch (e) { /* abaikan */ }
+  store = normalizeStore({});
+  try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* abaikan */ }
+  if (!silent) go("account");
 }
 
 async function api(pathName, { method = "GET", body, token } = {}) {
@@ -2153,74 +2175,123 @@ async function api(pathName, { method = "GET", body, token } = {}) {
   if (!res.ok) throw new Error(data.error || ("Gagal (" + res.status + ")"));
   return data;
 }
+function handleAuthErr(e) {
+  if (/terautentikasi|valid|kedaluwarsa/i.test(e.message)) { doLogout(true); toast("Sesi berakhir, silakan masuk lagi"); go("account"); }
+  else setSyncStatus("Gagal sinkron: " + e.message);
+}
+function setSyncStatus(msg) { const el2 = document.getElementById("syncStatus"); if (el2) el2.textContent = msg; }
+function cacheStore() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); } catch (e) { /* abaikan */ } }
 
-// Tulis data server ke localStorage tanpa memicu push balik (hindari loop).
-function applyRemoteStore(data, updatedAt) {
-  store = normalizeStore(data || {});
-  store._updatedAt = updatedAt || store._updatedAt || 0;
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); } catch (e) { /* abaikan */ }
+/* Konten = paket + soal (terpusat, dikelola admin). Progres = milik tiap user. */
+function contentData() { return { packages: store.packages || [], questions: store.questions || [] }; }
+function progressData() {
+  return {
+    records: store.records || {}, achievements: store.achievements || {},
+    qstats: store.qstats || {}, bookmarks: store.bookmarks || {}, practiceLog: store.practiceLog || [],
+  };
+}
+function applyContent(data) {
+  store.packages = Array.isArray(data && data.packages) ? data.packages : [];
+  store.questions = Array.isArray(data && data.questions) ? data.questions : [];
+  normalizeStore(store); cacheStore();
+}
+function applyProgress(data, updatedAt) {
+  data = data || {};
+  store.records = data.records || {};
+  store.achievements = data.achievements || {};
+  store.qstats = data.qstats || {};
+  store.bookmarks = data.bookmarks || {};
+  store.practiceLog = data.practiceLog || [];
+  store._updatedAt = updatedAt || 0;
+  normalizeStore(store); cacheStore();
 }
 
+// Dipanggil saat ada perubahan (saveStore): dorong progres; konten hanya jika admin.
 function schedulePush() {
   if (!isLoggedIn()) return;
-  clearTimeout(pushTimer);
-  pushTimer = setTimeout(pushNow, 1500);
+  clearTimeout(progTimer); progTimer = setTimeout(pushProgress, 1500);
+  if (isAdmin()) { clearTimeout(contentTimer); contentTimer = setTimeout(pushContent, 1500); }
 }
-async function pushNow() {
+async function pushProgress() {
   if (!isLoggedIn()) return;
   try {
-    await api("/data", { method: "PUT", token: authToken(), body: { data: store, updatedAt: store._updatedAt || Date.now() } });
-    setSyncStatus("Tersinkron ✓ " + fmtDate(Date.now()));
-  } catch (e) {
-    if (/terautentikasi|valid|kedaluwarsa/i.test(e.message)) { clearAuth(); toast("Sesi berakhir, silakan masuk lagi"); }
-    else setSyncStatus("Gagal sinkron: " + e.message);
-  }
+    await api("/progress", { method: "PUT", token: authToken(), body: { data: progressData(), updatedAt: store._updatedAt || Date.now() } });
+    setSyncStatus("Progres tersinkron ✓ " + fmtDate(Date.now()));
+  } catch (e) { handleAuthErr(e); }
+}
+async function pushContent() {
+  if (!isAdmin()) return;
+  try {
+    await api("/content", { method: "PUT", token: authToken(), body: { data: contentData(), updatedAt: Date.now() } });
+    setSyncStatus("Konten tersinkron ✓ " + fmtDate(Date.now()));
+  } catch (e) { handleAuthErr(e); }
 }
 
-// Saat baru login / buka aplikasi: samakan data lokal dengan server (last-write-wins, dengan opsi manual).
+function refreshView() { if (!examState) go(currentView || "home"); }
+
+// Tarik konten pusat + progres user dari server, terapkan ke store.
 async function syncOnLogin({ silent = false } = {}) {
   if (!isLoggedIn()) return;
-  let remote;
-  try { remote = await api("/data", { token: authToken() }); }
-  catch (e) { if (!silent) toast("Gagal memuat data server: " + e.message); if (/terautentikasi|valid|kedaluwarsa/i.test(e.message)) clearAuth(); return; }
-
-  const localHasData = (store.packages && store.packages.length) || Object.keys(store.records || {}).length;
-  const localTs = store._updatedAt || 0;
-  const remoteHasData = remote.data && typeof remote.data === "object";
-  const remoteTs = remote.updatedAt || 0;
-
-  if (!remoteHasData) { await pushNow(); if (!silent) toast("Data perangkat ini diunggah ke akunmu"); return; }
-  if (!localHasData) { applyRemoteStore(remote.data, remoteTs); if (!silent) toast("Data ditarik dari akunmu"); go(currentView === "account" ? "account" : "home"); return; }
-
-  if (remoteTs > localTs) { applyRemoteStore(remote.data, remoteTs); if (!silent) toast("Data terbaru ditarik dari server"); go(currentView === "account" ? "account" : "home"); }
-  else if (localTs > remoteTs) { await pushNow(); if (!silent) toast("Data perangkat ini lebih baru — diunggah"); }
-  else if (!silent) setSyncStatus("Sudah sinkron ✓");
+  // 1) Konten terpusat (server = sumber kebenaran)
+  try {
+    const c = await api("/content", { token: authToken() });
+    const d = c.data || {};
+    const remoteHasContent = Array.isArray(d.packages) && (d.packages.length || (Array.isArray(d.questions) && d.questions.length));
+    if (remoteHasContent) {
+      applyContent(d);
+    } else if (isAdmin() && store.packages && store.packages.length) {
+      await pushContent(); // admin pertama kali: jadikan konten lokal (seed) sebagai konten pusat
+      if (!silent) toast("Konten awal diunggah sebagai konten pusat");
+    } else {
+      applyContent({ packages: [], questions: [] }); // user: belum ada konten dari admin
+    }
+  } catch (e) { handleAuthErr(e); if (!silent) toast("Gagal memuat konten: " + e.message); }
+  // 2) Progres user (last-write-wins)
+  try {
+    const p = await api("/progress", { token: authToken() });
+    const remoteTs = p.updatedAt || 0, localTs = store._updatedAt || 0;
+    const remoteHas = p.data && typeof p.data === "object";
+    if (remoteHas && remoteTs >= localTs) applyProgress(p.data, remoteTs);
+    else if (localTs > remoteTs && (Object.keys(store.records || {}).length || Object.keys(store.qstats || {}).length)) await pushProgress();
+  } catch (e) { handleAuthErr(e); }
+  refreshView();
 }
-
-function setSyncStatus(msg) { const el2 = document.getElementById("syncStatus"); if (el2) el2.textContent = msg; }
 
 function renderAccount() {
   const root = app();
   root.innerHTML = "";
-  root.appendChild(el("h2", { class: "page-title" }, "Akun & Sinkronisasi"));
-  root.appendChild(el("p", { class: "page-sub" }, "Masuk untuk menyimpan soal, rekor, & statistik di server dan memakainya di semua perangkat. Tanpa login pun aplikasi tetap jalan offline."));
+  root.appendChild(el("h2", { class: "page-title" }, "Akun"));
 
   if (isLoggedIn()) {
-    root.appendChild(el("div", { class: "card", style: "max-width:520px" }, [
+    root.appendChild(el("p", { class: "page-sub" }, isAdmin()
+      ? "Kamu masuk sebagai admin — kamu mengelola paket & soal untuk semua pengguna."
+      : "Progres belajarmu otomatis tersimpan & sinkron di semua perangkat."));
+    const panel = el("div", { class: "card", style: "max-width:520px" }, [
       el("div", { class: "q-meta" }, "Masuk sebagai"),
-      el("h3", { style: "margin:2px 0 14px" }, authEmail() || "—"),
-      el("div", { id: "syncStatus", class: "q-meta", style: "margin-bottom:14px" }, "Sinkron otomatis setiap ada perubahan."),
-      el("div", { class: "btn-row" }, [
-        el("button", { class: "btn primary", onclick: () => { setSyncStatus("Mengunggah…"); pushNow(); } }, "⬆️ Unggah ke server"),
-        el("button", { class: "btn", onclick: () => { setSyncStatus("Menarik…"); pullOverwrite(); } }, "⬇️ Tarik dari server"),
-        el("button", { class: "btn danger", onclick: () => { clearAuth(); toast("Keluar dari akun"); renderAccount(); } }, "Keluar"),
+      el("div", { style: "display:flex;align-items:center;gap:10px;margin:2px 0 12px" }, [
+        el("h3", { style: "margin:0" }, authEmail() || "—"),
+        el("span", { class: "role-badge " + (isAdmin() ? "admin" : "user") }, isAdmin() ? "ADMIN" : "USER"),
       ]),
-      el("div", { class: "note", style: "margin-top:14px" }, "Sinkron otomatis memakai prinsip data terbaru menang. Pakai tombol di atas untuk memaksa arah sinkron bila perlu."),
-    ]));
+      el("div", { id: "syncStatus", class: "q-meta", style: "margin-bottom:14px" }, "Sinkron otomatis aktif."),
+      el("div", { class: "btn-row" }, [
+        el("button", { class: "btn primary", onclick: async () => { setSyncStatus("Menyinkronkan…"); await syncOnLogin(); setSyncStatus("Selesai disinkron ✓ " + fmtDate(Date.now())); } }, "🔄 Sinkronkan sekarang"),
+        el("button", { class: "btn danger", onclick: () => confirmModal("Keluar dari akun?", "Kamu perlu masuk lagi untuk memakai aplikasi.", () => { doLogout(); toast("Berhasil keluar"); }, "Ya, keluar") }, "Keluar"),
+      ]),
+    ]);
+    if (isAdmin()) {
+      panel.appendChild(el("div", { class: "divider" }));
+      panel.appendChild(el("div", { class: "q-meta", style: "margin-bottom:8px" }, "Panel admin"));
+      panel.appendChild(el("div", { class: "btn-row" }, [
+        el("button", { class: "btn", onclick: () => go("input") }, "📝 Kelola Soal & Paket"),
+        el("button", { class: "btn", onclick: () => go("adminusers") }, "👥 Kelola User"),
+      ]));
+    }
+    root.appendChild(panel);
     return;
   }
 
-  // Form masuk / daftar
+  // Belum login — wajib login untuk memakai aplikasi
+  root.appendChild(el("p", { class: "page-sub" }, "Masuk atau daftar untuk mulai belajar. Progresmu tersimpan & sinkron di semua perangkat."));
   const emailIn = el("input", { type: "text", id: "accEmail", placeholder: "nama@email.com", autocomplete: "username" });
   const passIn = el("input", { type: "password", id: "accPass", placeholder: "Minimal 6 karakter", autocomplete: "current-password" });
   const msg = el("div", { class: "q-meta", style: "min-height:18px;color:var(--red)" }, "");
@@ -2230,14 +2301,16 @@ function renderAccount() {
     if (!email || !password) { msg.textContent = "Isi email & password."; return; }
     try {
       const out = await api(mode === "register" ? "/register" : "/login", { method: "POST", body: { email, password } });
-      setAuth(out.token, out.email);
+      setAuth(out.token, out.email, out.role);
       msg.style.color = "var(--green)";
-      msg.textContent = mode === "register" ? "Akun dibuat. Menyinkronkan…" : "Berhasil masuk. Menyinkronkan…";
-      await syncOnLogin();
-      renderAccount();
-      toast("Selamat datang, " + out.email);
+      msg.textContent = "Berhasil. Menyiapkan data…";
+      await syncOnLogin({ silent: true });
+      updateAccountNav();
+      go("home");
+      toast("Selamat datang, " + out.email + (out.role === "admin" ? " (admin)" : ""));
     } catch (e) { msg.textContent = e.message; }
   };
+  passIn.addEventListener("keydown", (e) => { if (e.key === "Enter") submit("login"); });
 
   root.appendChild(el("div", { class: "card", style: "max-width:460px" }, [
     field("Email", emailIn),
@@ -2250,16 +2323,42 @@ function renderAccount() {
   ]));
 }
 
-// Tarik paksa data server, menimpa data lokal (dengan konfirmasi).
-function pullOverwrite() {
-  confirmModal("Tarik dari server?", "Data di perangkat ini akan diganti dengan data dari akunmu.", async () => {
-    try {
-      const remote = await api("/data", { token: authToken() });
-      if (!remote.data) { toast("Belum ada data di server"); return; }
-      applyRemoteStore(remote.data, remote.updatedAt || Date.now());
-      toast("Data ditarik dari server"); go("home");
-    } catch (e) { toast("Gagal: " + e.message); }
-  }, "Ya, tarik");
+/* ---------- Admin: kelola user ---------- */
+async function renderAdminUsers() {
+  const root = app();
+  root.innerHTML = "";
+  root.appendChild(el("h2", { class: "page-title" }, "Kelola User"));
+  if (!isAdmin()) { root.appendChild(emptyState("🔒", "Khusus admin", "Halaman ini hanya untuk admin.")); return; }
+  root.appendChild(el("p", { class: "page-sub" }, "Daftar pengguna terdaftar. Kamu bisa menghapus user biasa (beserta progresnya)."));
+  const card = el("div", { class: "card", style: "padding:0;overflow:hidden" }, [el("div", { class: "q-meta", style: "padding:16px" }, "Memuat…")]);
+  root.appendChild(card);
+  try {
+    const out = await api("/admin/users", { token: authToken() });
+    card.innerHTML = "";
+    const table = el("table", { class: "subj" });
+    table.appendChild(el("tr", {}, [el("th", {}, "Email"), el("th", {}, "Peran"), el("th", {}, "Terdaftar"), el("th", {}, "Aksi")]));
+    out.users.forEach((u) => {
+      const isMe = u.email === authEmail();
+      const action = (u.role === "admin" || isMe)
+        ? el("span", { class: "q-meta" }, isMe ? "(kamu)" : "—")
+        : el("button", { class: "btn sm danger", onclick: () => confirmModal("Hapus user?", `User "${u.email}" beserta seluruh progresnya akan dihapus permanen.`, async () => {
+            try { await api("/admin/users/" + u.id, { method: "DELETE", token: authToken() }); toast("User dihapus"); renderAdminUsers(); }
+            catch (e) { toast("Gagal: " + e.message); }
+          }, "Ya, hapus") }, "Hapus");
+      table.appendChild(el("tr", {}, [
+        el("td", {}, u.email),
+        el("td", {}, el("span", { class: "role-badge " + (u.role === "admin" ? "admin" : "user") }, u.role.toUpperCase())),
+        el("td", {}, fmtDate(new Date(u.created_at).getTime())),
+        el("td", {}, action),
+      ]));
+    });
+    card.appendChild(table);
+    card.appendChild(el("div", { class: "q-meta", style: "padding:12px 16px" }, `Total: ${out.users.length} user`));
+  } catch (e) {
+    card.innerHTML = "";
+    card.appendChild(el("div", { class: "q-meta", style: "padding:16px;color:var(--red)" }, "Gagal memuat: " + e.message));
+    handleAuthErr(e);
+  }
 }
 
 /* ---------- Tema gelap/terang ---------- */
@@ -2284,11 +2383,13 @@ function toggleTheme() {
 
 /* ---------- boot ---------- */
 updateAccountNav();
-if (tryRestoreExam()) {
+if (!isLoggedIn()) {
+  go("account");                         // wajib login
+} else if (tryRestoreExam()) {
   go("exam");
   toast("Tryout sebelumnya dilanjutkan dari posisi terakhir");
+  syncOnLogin({ silent: true });         // segarkan data di latar belakang (tidak mengganggu ujian)
 } else {
   go("home");
+  syncOnLogin({ silent: true });         // tarik konten pusat + progres
 }
-// Sinkron diam-diam saat buka aplikasi (jika sudah login & tidak sedang ujian).
-if (isLoggedIn() && !examState) syncOnLogin({ silent: true });
