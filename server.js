@@ -19,22 +19,30 @@ const pool = DATABASE_URL
   ? new pg.Pool({ connectionString: DATABASE_URL, ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: false } : false })
   : null;
 
-async function initDb() {
+const SCHEMA_SQL = `
+  CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+  CREATE TABLE IF NOT EXISTS user_data (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    data JSONB,
+    updated_at BIGINT NOT NULL DEFAULT 0
+  );
+`;
+// Coba buat skema dengan retry — Postgres kadang baru siap beberapa detik setelah app.
+async function initDb(retries = 15) {
   if (!pool) return;
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-    CREATE TABLE IF NOT EXISTS user_data (
-      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      data JSONB,
-      updated_at BIGINT NOT NULL DEFAULT 0
-    );
-  `);
-  console.log("✅ Skema database siap.");
+  for (let i = 1; i <= retries; i++) {
+    try { await pool.query(SCHEMA_SQL); console.log("✅ Skema database siap."); return; }
+    catch (e) {
+      console.warn(`⏳ DB belum siap (${i}/${retries}): ${e.message}`);
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+  console.error("❌ Gagal menyiapkan skema DB setelah beberapa percobaan.");
 }
 
 const app = express();
