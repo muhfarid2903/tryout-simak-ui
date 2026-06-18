@@ -1,0 +1,19 @@
+{
+  "name": "tryout-simak-ui",
+  "version": "1.0.0",
+  "description": "Tryout SIMAK UI Pascasarjana — latihan soal offline-first dengan login & sinkron antar perangkat.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.12.0"
+  }
+}
