@@ -489,6 +489,7 @@ function prepareImported(data) {
     if (q.image == null) q.image = "";
     if (q.subject == null) q.subject = "";
     if (q.pembahasan == null) q.pembahasan = "";
+    if (!Array.isArray(q.optExplain)) q.optExplain = []; // penjelasan per pilihan (kenapa salah)
   });
   return normalizeStore(data);
 }
@@ -507,6 +508,7 @@ function seedStore() {
       { id: uid(), packageId: pkgId, subject: "Kemampuan Verbal",
         text: "Sinonim kata KONVERGEN adalah ...", image: "",
         options: ["Memusat", "Menyebar", "Melebar", "Berbeda", "Bercabang"], answer: 0,
+        optExplain: ["Tepat — konvergen = mengumpul ke satu titik.", "Ini justru makna DIVERGEN, lawan katanya.", "Sama arah dengan 'menyebar' — menjauh dari satu titik.", "Terlalu umum; tidak menangkap arti 'memusat'.", "Bercabang = memencar, kebalikan dari konvergen."],
         pembahasan: "Konvergen berarti menuju satu titik pertemuan / memusat. Lawan katanya divergen (menyebar). Jawaban: A." },
       { id: uid(), packageId: pkgId, subject: "Kemampuan Verbal",
         text: "DOKTER : STETOSKOP = PELUKIS : ...", image: "",
@@ -1134,17 +1136,18 @@ function openEditForm(pkgId, qId) {
 }
 
 function buildQuestionForm(pkgId, existing) {
-  const data = existing || { subject: "", text: "", image: "", options: ["", "", "", "", ""], answer: 0, pembahasan: "" };
+  const data = existing || { subject: "", text: "", image: "", options: ["", "", "", "", ""], answer: 0, pembahasan: "", optExplain: [] };
   let correctIdx = data.answer;
 
   const optionRows = OPT_KEYS.map((k, i) => {
     const keyBtn = el("button", { type: "button", class: "opt-key" + (i === correctIdx ? " correct" : ""), title: "Tandai sebagai kunci jawaban" }, k);
     const input = el("input", { type: "text", placeholder: `Pilihan ${k}`, value: data.options[i] || "" });
+    const noteInput = el("input", { type: "text", class: "opt-explain-input", placeholder: `Kenapa ${k} salah / catatan (opsional)`, value: (data.optExplain && data.optExplain[i]) || "" });
     keyBtn.addEventListener("click", () => {
       correctIdx = i;
       form.querySelectorAll(".opt-key").forEach((b, bi) => b.classList.toggle("correct", bi === i));
     });
-    return el("div", { class: "option-row" }, [keyBtn, input]);
+    return el("div", { class: "option-row-group" }, [el("div", { class: "option-row" }, [keyBtn, input]), noteInput]);
   });
 
   const subjectInput = el("input", { type: "text", placeholder: "mis. Kemampuan Verbal", value: data.subject || "", list: "subjlist" });
@@ -1164,18 +1167,19 @@ function buildQuestionForm(pkgId, existing) {
     field("Pertanyaan", textInput, "rumus: apit dengan $...$ — mis. $\\frac{a}{b}$, $x^2$, $\\sqrt{x}$, $\\pi$, $\\leq$"),
     field("Gambar", imgInput, "opsional, tempel link gambar"),
     el("div", { class: "field" }, [
-      el("label", {}, ["Pilihan jawaban ", el("span", { class: "hint" }, "— klik huruf untuk menandai kunci jawaban")]),
+      el("label", {}, ["Pilihan jawaban ", el("span", { class: "hint" }, "— klik huruf untuk menandai kunci jawaban; isi catatan tiap pilihan untuk umpan balik kenapa salah")]),
       ...optionRows,
     ]),
     field("Pembahasan", pembInput),
     el("div", { class: "btn-row" }, [
       el("button", { class: "btn primary", onclick: () => {
-        const opts = optionRows.map(r => r.querySelector("input").value.trim());
+        const opts = optionRows.map(r => r.querySelector(".option-row input").value.trim());
+        const optExplain = optionRows.map(r => r.querySelector(".opt-explain-input").value.trim());
         const text = textInput.value.trim();
         if (!text) { toast("Pertanyaan tidak boleh kosong"); return; }
         if (opts.filter(o => o).length < 2) { toast("Isi minimal 2 pilihan jawaban"); return; }
         if (!opts[correctIdx]) { toast("Pilihan yang ditandai kunci masih kosong"); return; }
-        const payload = { subject: subjectInput.value.trim(), text, image: imgInput.value.trim(), options: opts, answer: correctIdx, pembahasan: pembInput.value.trim() };
+        const payload = { subject: subjectInput.value.trim(), text, image: imgInput.value.trim(), options: opts, answer: correctIdx, pembahasan: pembInput.value.trim(), optExplain };
         if (isEdit) { Object.assign(existing, payload); toast("Soal diperbarui"); }
         else { store.questions.push({ id: uid(), packageId: pkgId, ...payload }); toast("Soal ditambahkan"); }
         saveStore(); renderInputFor(pkgId);
@@ -1477,6 +1481,12 @@ function prepareQuestion(q, shuffleOpts) {
   let order = q.options.map((o, i) => ({ o, i })).filter(x => x.o.trim() !== "").map(x => x.i);
   if (shuffleOpts) order = shuffle(order);
   return { ...q, order };
+}
+// Umpan balik per-distraktor: penjelasan kenapa sebuah pilihan benar/salah (jika ada).
+function optNoteEl(q, origIdx, isCorrect) {
+  const note = q.optExplain && q.optExplain[origIdx];
+  if (!note || !String(note).trim()) return null;
+  return el("div", { class: "opt-note " + (isCorrect ? "correct" : "wrong"), html: renderMath(note) });
 }
 
 function buildSections(pkg, qs) {
@@ -1881,6 +1891,7 @@ function renderResult(r) {
           el("div", { class: "key" }, OPT_KEYS[displayIdx]),
           el("div", { class: "ctext", html: renderMath(q.options[origIdx]) + (isCorrect ? "  ✓ kunci" : (isChosen ? "  ✗ jawabanmu" : "")) }),
         ]));
+        const note = optNoteEl(q, origIdx, isCorrect); if (note) card.appendChild(note);
       });
       if (q.pembahasan) card.appendChild(el("div", { class: "pembahasan" }, [el("strong", {}, "Pembahasan: "), el("span", { html: renderMath(q.pembahasan) })]));
       root.appendChild(card);
@@ -2175,6 +2186,7 @@ function renderPracticeSession() {
     ]);
     if (!revealed) choice.addEventListener("click", () => answerPractice(displayIdx));
     card.appendChild(choice);
+    if (revealed) { const note = optNoteEl(q, origIdx, origIdx === q.answer); if (note) card.appendChild(note); }
   });
   if (revealed && ps.confidence[i]) {
     const ok = q.order[chosen] === q.answer, cm = CONF_META[ps.confidence[i]];

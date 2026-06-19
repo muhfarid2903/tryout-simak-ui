@@ -20,7 +20,8 @@ Buka file **`index.html`** dengan klik dua kali (atau klik kanan → Open With �
 - **Mode ujian** — timer mundur, navigasi soal, tandai ragu-ragu, auto-submit saat waktu habis / waktu sesi habis.
   - **Pintasan keyboard:** `1`–`5` atau `A`–`E` untuk memilih jawaban, `←`/`→` pindah soal, `F` tandai ragu-ragu.
   - **Tahan reload:** progres tryout otomatis tersimpan, jadi jika halaman ter-refresh / tab tertutup tak sengaja, tryout dilanjutkan dari posisi terakhir (timer tetap berjalan sesuai waktu nyata).
-- **Input Soal** — buat paket, atur mode waktu & durasi tiap mata uji, tambah/edit/hapus soal. Soal langsung muncul di tryout.
+- **Umpan balik per-distraktor (baru)** — selain pembahasan umum, tiap pilihan jawaban bisa diberi **catatan kenapa salah** (atau kenapa benar). Saat kunci terbuka di Latihan & di review Hasil, catatan muncul tepat di bawah pilihan terkait (garis hijau untuk kunci, merah untuk distraktor) — jadi kamu paham *mengapa* opsi lain keliru, bukan sekadar tahu yang benar. Diisi di form Input Soal (kolom catatan di tiap pilihan) atau lewat field `optExplain` saat import.
+- **Input Soal** — buat paket, atur mode waktu & durasi tiap mata uji, tambah/edit/hapus soal, plus **catatan per pilihan** untuk umpan balik kenapa salah. Soal langsung muncul di tryout.
 - **Bank Soal** — lihat semua soal beserta kuncinya.
 - **Materi** — bukan sekadar ringkasan, tapi bahan belajar lengkap untuk tiap mata uji, terbagi dua bagian:
   - **Pengetahuan Dasar & Cara Belajar** — skill apa yang diuji, fondasi yang wajib dikuasai (mis. untuk Bahasa Inggris: parts of speech, tenses, agreement, articles, prepositions, clauses, conditionals; serta fondasi kosakata: akar kata, prefiks/sufiks, word family, Academic Word List), cara meningkatkan vocabulary/grammar, dan contoh rencana belajar.
@@ -59,6 +60,7 @@ File import berupa **JSON** berisi satu objek dengan dua array: `packages` dan `
 | `answer` | ya | Kunci jawaban. Boleh huruf `"A"`–`"E"` **atau** angka indeks `0`–`4` (0 = A). |
 | `image` | tidak | URL gambar soal (opsional). |
 | `pembahasan` | tidak | Penjelasan jawaban (opsional). |
+| `optExplain` | tidak | Array sejajar dengan `options` — catatan kenapa tiap pilihan salah/benar (umpan balik per-distraktor). Indeks kosong (`""`) = tanpa catatan. |
 
 ### Contoh minimal
 ```json
@@ -70,7 +72,8 @@ File import berupa **JSON** berisi satu objek dengan dua array: `packages` dan `
       "text": "Sinonim RELEVAN adalah ...",
       "options": ["Bertautan", "Acuh", "Ragu", "Sepadan", "Berbeda"],
       "answer": "A",
-      "pembahasan": "Relevan = berkaitan/bertautan."
+      "pembahasan": "Relevan = berkaitan/bertautan.",
+      "optExplain": ["Tepat — relevan = bertautan.", "Acuh = tak peduli, beda makna.", "Ragu tidak terkait makna 'relevan'.", "Sepadan = setara, bukan sinonim utama.", "Berbeda justru lawan arah."]
     }
   ]
 }
