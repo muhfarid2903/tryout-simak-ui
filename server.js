@@ -188,6 +188,28 @@ app.delete("/api/admin/users/:id", requireDb, auth, adminOnly, async (req, res) 
   } catch (e) { console.error(e); res.status(500).json({ error: "Gagal menghapus user" }); }
 });
 
+// Rekap hasil ujian seluruh user (rekor & riwayat per paket) — khusus admin.
+app.get("/api/admin/results", requireDb, auth, adminOnly, async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT u.id, u.email, u.role, ud.data, ud.updated_at
+       FROM users u LEFT JOIN user_data ud ON ud.user_id = u.id
+       ORDER BY u.created_at ASC`
+    );
+    const c = await pool.query("SELECT data FROM content WHERE id=1");
+    const content = (c.rows[0] && c.rows[0].data) || {};
+    const packages = (content.packages || []).map((p) => ({ id: p.id, name: p.name || p.title || "(Tanpa nama)" }));
+    const users = rows.map((r) => ({
+      id: r.id,
+      email: r.email,
+      role: r.role,
+      updatedAt: Number(r.updated_at) || 0,
+      records: (r.data && r.data.records) || {},
+    }));
+    res.json({ packages, users });
+  } catch (e) { console.error(e); res.status(500).json({ error: "Gagal memuat hasil ujian" }); }
+});
+
 // ---------- Static frontend ----------
 app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
 app.get("*", (_req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
