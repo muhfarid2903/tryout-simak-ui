@@ -62,53 +62,171 @@ body {
   transition: background .2s ease, color .2s ease;
 }
 
-/* ---------- Top bar ---------- */
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 24px;
+/* =========================================================================
+   LAYOUT: SIDEBAR (ala Claude — bisa dibuka, ditutup, & dilipat)
+   ========================================================================= */
+:root { --sidebar-w: 264px; --sidebar-rail: 72px; }
+
+.layout { display: flex; min-height: 100vh; }
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  width: var(--sidebar-w);
+  flex: none;
   background: var(--brand-dark);
   color: #fff;
-  flex-wrap: wrap;
+  display: flex;
+  flex-direction: column;
   position: sticky;
   top: 0;
-  z-index: 50;
+  height: 100vh;
+  z-index: 60;
+  transition: width .22s ease, transform .22s ease;
+  overflow: hidden;
 }
-.brand { display: flex; align-items: center; gap: 14px; }
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 14px;
+  min-height: 78px;
+}
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .logo {
   display: grid;
   place-items: center;
-  width: 46px; height: 46px;
+  width: 44px; height: 44px;
   background: var(--ui-yellow);
   color: var(--brand-dark);
   font-weight: 800;
   border-radius: 10px;
   font-size: 18px;
   letter-spacing: 1px;
+  flex: none;
 }
-.topbar h1 { margin: 0; font-size: 18px; }
-.tagline { margin: 0; font-size: 12px; color: #cbd5e1; }
-.mainnav { display: flex; gap: 6px; flex-wrap: wrap; }
+.brand-text { min-width: 0; }
+.sidebar h1 { margin: 0; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tagline { margin: 0; font-size: 11.5px; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.sidebar-collapse {
+  margin-left: auto;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.15);
+  color: #fff;
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  flex: none;
+  display: grid; place-items: center;
+  transition: background .15s ease;
+}
+.sidebar-collapse:hover { background: rgba(255,255,255,.2); }
+
+/* ---------- Daftar navigasi (vertikal) ---------- */
+.mainnav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  overflow-y: auto;
+  flex: 1;
+}
+.mainnav::-webkit-scrollbar { width: 8px; }
+.mainnav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 8px; }
 .navbtn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
   background: transparent;
   border: 1px solid transparent;
   color: #e2e8f0;
-  padding: 8px 14px;
-  border-radius: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  transition: background .15s ease, color .15s ease;
 }
+.nav-ico { font-size: 17px; width: 22px; text-align: center; flex: none; line-height: 1; }
+.nav-label { overflow: hidden; text-overflow: ellipsis; }
 .navbtn:hover { background: rgba(255,255,255,0.1); }
 .navbtn.active { background: var(--ui-yellow); color: var(--brand-dark); }
 
-/* ---------- Layout ---------- */
+/* ---------- Kaki sidebar (tombol tema) ---------- */
+.sidebar-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255,255,255,.1);
+}
+.theme-label { font-size: 13.5px; font-weight: 600; color: #cbd5e1; }
+
+/* ---------- Bilah atas khusus layar kecil ---------- */
+.topbar-mobile {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--brand-dark);
+  color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+.topbar-mobile .brand { gap: 10px; }
+.topbar-mobile .logo { width: 36px; height: 36px; font-size: 15px; }
+.topbar-mobile h1 { margin: 0; font-size: 16px; }
+.hamburger {
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.2);
+  color: #fff;
+  width: 38px; height: 38px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  flex: none;
+  display: grid; place-items: center;
+}
+
+/* ---------- Latar gelap (mobile) ---------- */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 12, 20, .55);
+  z-index: 55;
+  opacity: 0;
+  transition: opacity .22s ease;
+}
+
+/* =========================================================================
+   STATE: sidebar dilipat (desktop) — hanya menampilkan ikon (rail)
+   ========================================================================= */
+.sidebar-collapsed .sidebar { width: var(--sidebar-rail); }
+.sidebar-collapsed .brand-text,
+.sidebar-collapsed .theme-label { display: none; }
+.sidebar-collapsed .sidebar-head { justify-content: center; padding: 16px 0; }
+.sidebar-collapsed .sidebar-collapse { margin-left: 0; transform: rotate(180deg); }
+.sidebar-collapsed .mainnav { padding: 8px; align-items: center; }
+.sidebar-collapsed .navbtn { justify-content: center; padding: 10px 0; width: 48px; }
+.sidebar-collapsed .nav-label { display: none; }
+.sidebar-collapsed .sidebar-foot { justify-content: center; }
+
+/* ---------- Area konten ---------- */
+.content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 main {
+  flex: 1;
+  width: 100%;
   max-width: 1080px;
   margin: 0 auto;
-  padding: 28px 20px 80px;
+  padding: 28px 28px 80px;
 }
 .page-title { margin: 0 0 4px; font-size: 24px; }
 .page-sub { margin: 0 0 24px; color: var(--ui-ink-soft); }
@@ -462,15 +580,30 @@ table.subj th { background: var(--surface-soft); }
 .pkg-card { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
 .pkg-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(16,24,40,.12); border-color: var(--ui-yellow-dark); }
 
+/* ---------- Responsif: sidebar jadi off-canvas (layar kecil) ---------- */
+@media (max-width: 880px) {
+  .topbar-mobile { display: flex; }
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    height: 100vh;
+    width: var(--sidebar-w) !important;   /* abaikan lipatan rail di mobile */
+    transform: translateX(-100%);
+    box-shadow: 4px 0 24px rgba(0,0,0,.35);
+  }
+  /* Drawer selalu tampil penuh — abaikan kondisi "lipat" dari desktop. */
+  .sidebar .brand-text, .sidebar .theme-label, .sidebar .nav-label { display: revert; }
+  .sidebar .sidebar-collapse { display: none; }   /* lipat hanya relevan di desktop */
+  .sidebar .sidebar-head { justify-content: flex-start; padding: 16px 14px; }
+  .sidebar .mainnav { align-items: stretch; padding: 8px 12px; }
+  .sidebar .navbtn { justify-content: flex-start; padding: 10px 12px; width: 100%; }
+  .sidebar .sidebar-foot { justify-content: flex-start; }
+  .sidebar-open .sidebar { transform: translateX(0); }
+  .sidebar-open .sidebar-backdrop { opacity: 1; }
+}
+
 /* ---------- Responsif (HP) ---------- */
 @media (max-width: 680px) {
-  .topbar { padding: 10px 14px; gap: 10px; }
-  .topbar h1 { font-size: 16px; }
-  .tagline { display: none; }
-  .logo { width: 40px; height: 40px; font-size: 16px; }
-  .mainnav { width: 100%; order: 3; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 3px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-  .mainnav::-webkit-scrollbar { display: none; }
-  .navbtn { flex: none; padding: 7px 12px; }
   main { padding: 20px 14px 72px; }
   .page-title { font-size: 21px; }
   .score-hero { padding: 22px 16px; }
@@ -487,7 +620,7 @@ table.subj th { background: var(--surface-soft); }
 /* ---------- Peran & gating navigasi ---------- */
 .navbtn[data-view="input"], .navbtn[data-view="adminusers"] { display: none; }
 body.is-admin .navbtn[data-view="input"],
-body.is-admin .navbtn[data-view="adminusers"] { display: inline-flex; }
+body.is-admin .navbtn[data-view="adminusers"] { display: flex; }
 body:not(.logged-in) .mainnav .navbtn:not([data-view="account"]) { display: none; }
 
 .role-badge { font-size: 11px; font-weight: 800; letter-spacing: .5px; padding: 2px 8px; border-radius: 6px; }

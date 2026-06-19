@@ -2378,7 +2378,10 @@ function clearAuth() {
 }
 function updateAccountNav() {
   const acc = document.querySelector('.navbtn[data-view="account"]');
-  if (acc) acc.textContent = isLoggedIn() ? (isAdmin() ? "👤 Admin" : "👤 Akun") : "Masuk";
+  if (acc) {
+    const label = acc.querySelector(".nav-label") || acc;
+    label.textContent = isLoggedIn() ? (isAdmin() ? "Admin" : "Akun") : "Masuk";
+  }
   document.body.classList.toggle("logged-in", isLoggedIn());
   document.body.classList.toggle("is-admin", isAdmin());
 }
@@ -2608,6 +2611,38 @@ function toggleTheme() {
   const b = document.getElementById("themeToggle");
   if (b) b.addEventListener("click", toggleTheme);
   applyThemeIcon();
+})();
+
+/* ---------- Sidebar: lipat (desktop) & buka/tutup (mobile) ---------- */
+(function initSidebar() {
+  const root = document.documentElement;
+  const SIDEBAR_KEY = "tryout_simak_ui_sidebar";
+  const backdrop = document.getElementById("sidebarBackdrop");
+
+  // Lipat / bentangkan di desktop (kondisi disimpan agar bertahan).
+  const collapseBtn = document.getElementById("sidebarCollapse");
+  if (collapseBtn) collapseBtn.addEventListener("click", () => {
+    const collapsed = root.classList.toggle("sidebar-collapsed");
+    try { localStorage.setItem(SIDEBAR_KEY, collapsed ? "collapsed" : "expanded"); } catch (e) { /* abaikan */ }
+  });
+
+  // Drawer di layar kecil.
+  function openDrawer() {
+    root.classList.add("sidebar-open");
+    if (backdrop) backdrop.hidden = false;
+  }
+  function closeDrawer() {
+    root.classList.remove("sidebar-open");
+    if (backdrop) backdrop.hidden = true;
+  }
+  const openBtn = document.getElementById("sidebarOpen");
+  if (openBtn) openBtn.addEventListener("click", openDrawer);
+  if (backdrop) backdrop.addEventListener("click", closeDrawer);
+  // Memilih menu di mobile otomatis menutup drawer.
+  const nav = document.getElementById("mainnav");
+  if (nav) nav.addEventListener("click", e => { if (e.target.closest(".navbtn")) closeDrawer(); });
+  // Tombol Esc menutup drawer.
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
 })();
 
 /* ---------- boot ---------- */
