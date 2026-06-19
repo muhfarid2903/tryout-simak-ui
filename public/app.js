@@ -889,6 +889,7 @@ function setNav(view) {
   document.querySelectorAll(".navbtn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
 }
 function go(view, arg) {
+  document.body.classList.remove("auth-screen"); // renderAccount akan menyalakannya lagi bila belum login
   // Wajib login: selain halaman akun, arahkan ke login bila belum masuk.
   if (!isLoggedIn() && view !== "account") { currentView = "account"; setNav(""); window.scrollTo(0, 0); renderAccount(); return; }
   // Halaman admin hanya untuk admin.
@@ -2492,9 +2493,10 @@ async function syncOnLogin({ silent = false } = {}) {
 function renderAccount() {
   const root = app();
   root.innerHTML = "";
-  root.appendChild(el("h2", { class: "page-title" }, "Akun"));
 
   if (isLoggedIn()) {
+    document.body.classList.remove("auth-screen");
+    root.appendChild(el("h2", { class: "page-title" }, "Akun"));
     root.appendChild(el("p", { class: "page-sub" }, isAdmin()
       ? "Kamu masuk sebagai admin — kamu mengelola paket & soal untuk semua pengguna."
       : "Progres belajarmu otomatis tersimpan & sinkron di semua perangkat."));
@@ -2522,17 +2524,18 @@ function renderAccount() {
     return;
   }
 
-  // Belum login — wajib login untuk memakai aplikasi
-  root.appendChild(el("p", { class: "page-sub" }, "Masuk atau daftar untuk mulai belajar. Progresmu tersimpan & sinkron di semua perangkat."));
+  // Belum login — layar masuk penuh (kartu di tengah, ala onboarding)
+  document.body.classList.add("auth-screen");
   const emailIn = el("input", { type: "text", id: "accEmail", placeholder: "nama@email.com", autocomplete: "username" });
   const passIn = el("input", { type: "password", id: "accPass", placeholder: "Minimal 6 karakter", autocomplete: "current-password" });
-  const msg = el("div", { class: "q-meta", style: "min-height:18px;color:var(--red)" }, "");
-  const submit = async (mode) => {
+  const msg = el("div", { class: "auth-msg", style: "min-height:18px;color:var(--red)" }, "");
+  let mode = "login";
+  const submit = async (m) => {
     const email = emailIn.value.trim(), password = passIn.value;
     msg.style.color = "var(--red)"; msg.textContent = "";
     if (!email || !password) { msg.textContent = "Isi email & password."; return; }
     try {
-      const out = await api(mode === "register" ? "/register" : "/login", { method: "POST", body: { email, password } });
+      const out = await api(m === "register" ? "/register" : "/login", { method: "POST", body: { email, password } });
       setAuth(out.token, out.email, out.role);
       msg.style.color = "var(--green)";
       msg.textContent = "Berhasil. Menyiapkan data…";
@@ -2542,16 +2545,46 @@ function renderAccount() {
       toast("Selamat datang, " + out.email + (out.role === "admin" ? " (admin)" : ""));
     } catch (e) { msg.textContent = e.message; }
   };
-  passIn.addEventListener("keydown", (e) => { if (e.key === "Enter") submit("login"); });
 
-  root.appendChild(el("div", { class: "card", style: "max-width:460px" }, [
+  const title = el("h2", { class: "auth-title" }, "Masuk");
+  const sub = el("p", { class: "auth-sub" }, "Masuk untuk mulai belajar. Progresmu tersimpan & sinkron di semua perangkat.");
+  const submitBtn = el("button", { class: "btn primary auth-submit", onclick: () => submit(mode) }, "Masuk");
+  const switchLink = el("button", { class: "auth-link", type: "button" }, "Daftar baru");
+  const switchLine = el("p", { class: "auth-foot" }, ["Belum punya akun? ", switchLink]);
+  // Beralih antara mode Masuk & Daftar (mirip alur onboarding).
+  switchLink.addEventListener("click", () => {
+    mode = mode === "login" ? "register" : "login";
+    const reg = mode === "register";
+    title.textContent = reg ? "Daftar Akun" : "Masuk";
+    sub.textContent = reg ? "Buat akun baru untuk menyimpan & menyinkronkan progresmu."
+                          : "Masuk untuk mulai belajar. Progresmu tersimpan & sinkron di semua perangkat.";
+    submitBtn.textContent = reg ? "Daftar" : "Masuk";
+    switchLine.replaceChildren(reg ? "Sudah punya akun? " : "Belum punya akun? ", switchLink);
+    switchLink.textContent = reg ? "Masuk di sini" : "Daftar baru";
+    passIn.setAttribute("autocomplete", reg ? "new-password" : "current-password");
+    msg.textContent = "";
+  });
+  passIn.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(mode); });
+
+  const card = el("div", { class: "auth-card" }, [
+    el("div", { class: "auth-brand" }, [
+      el("span", { class: "logo" }, "UI"),
+      el("div", { class: "auth-brand-text" }, [
+        el("strong", {}, "Tryout SIMAK UI"),
+        el("span", {}, "Pascasarjana"),
+      ]),
+    ]),
+    title,
+    sub,
     field("Email", emailIn),
     field("Password", passIn),
     msg,
-    el("div", { class: "btn-row", style: "margin-top:8px" }, [
-      el("button", { class: "btn primary", onclick: () => submit("login") }, "Masuk"),
-      el("button", { class: "btn", onclick: () => submit("register") }, "Daftar baru"),
-    ]),
+    submitBtn,
+    switchLine,
+  ]);
+  root.appendChild(el("div", { class: "auth-wrap" }, [
+    el("div", { class: "auth-decor", "aria-hidden": "true" }),
+    card,
   ]));
 }
 
