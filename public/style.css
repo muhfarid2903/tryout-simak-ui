@@ -636,9 +636,10 @@ table.subj th { background: var(--surface-soft); }
 }
 
 /* ---------- Peran & gating navigasi ---------- */
-.navbtn[data-view="input"], .navbtn[data-view="adminusers"] { display: none; }
+.navbtn[data-view="input"], .navbtn[data-view="adminusers"], .navbtn[data-view="adminresults"] { display: none; }
 body.is-admin .navbtn[data-view="input"],
-body.is-admin .navbtn[data-view="adminusers"] { display: flex; }
+body.is-admin .navbtn[data-view="adminusers"],
+body.is-admin .navbtn[data-view="adminresults"] { display: flex; }
 body:not(.logged-in) .mainnav .navbtn:not([data-view="account"]) { display: none; }
 
 .role-badge { font-size: 11px; font-weight: 800; letter-spacing: .5px; padding: 2px 8px; border-radius: 6px; }

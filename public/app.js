@@ -882,8 +882,8 @@ let examTimer = null;
 let practiceState = null;
 let _activeQ = null, _tickStart = 0; // pelacakan waktu per soal saat ujian
 
-const NAV_VIEWS = ["home", "practice", "stats", "input", "bank", "materi", "achievements", "adminusers", "account"];
-const ADMIN_VIEWS = ["input", "adminusers"];
+const NAV_VIEWS = ["home", "practice", "stats", "input", "bank", "materi", "achievements", "adminresults", "adminusers", "account"];
+const ADMIN_VIEWS = ["input", "adminusers", "adminresults"];
 let currentView = "home";
 function setNav(view) {
   document.querySelectorAll(".navbtn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
@@ -908,6 +908,7 @@ function go(view, arg) {
   else if (view === "result") renderResult(arg);
   else if (view === "account") renderAccount();
   else if (view === "adminusers") renderAdminUsers();
+  else if (view === "adminresults") renderAdminResults();
 }
 document.getElementById("mainnav").addEventListener("click", e => {
   const btn = e.target.closest(".navbtn");
@@ -2624,6 +2625,106 @@ async function renderAdminUsers() {
     card.appendChild(el("div", { class: "q-meta", style: "padding:16px;color:var(--red)" }, "Gagal memuat: " + e.message));
     handleAuthErr(e);
   }
+}
+
+/* ---------- Admin: hasil ujian semua user ---------- */
+async function renderAdminResults() {
+  const root = app();
+  root.innerHTML = "";
+  document.body.classList.remove("auth-screen");
+  root.appendChild(el("h2", { class: "page-title" }, "Hasil Ujian"));
+  if (!isAdmin()) { root.appendChild(emptyState("🔒", "Khusus admin", "Halaman ini hanya untuk admin.")); return; }
+  root.appendChild(el("p", { class: "page-sub" }, "Rekap hasil tryout seluruh pengguna — rekor, jumlah percobaan, dan skor terakhir tiap paket."));
+
+  const status = el("div", { class: "q-meta" }, "Memuat…");
+  root.appendChild(status);
+  let out;
+  try {
+    out = await api("/admin/results", { token: authToken() });
+  } catch (e) {
+    status.style.color = "var(--red)"; status.textContent = "Gagal memuat: " + e.message; handleAuthErr(e); return;
+  }
+  status.remove();
+
+  const pkgName = {};
+  (out.packages || []).forEach((p) => { pkgName[p.id] = p.name; });
+  const users = out.users || [];
+  const attemptsOf = (u) => Object.values(u.records || {}).reduce((a, r) => a + (r.attempts || 0), 0);
+  const totalAttempts = users.reduce((a, u) => a + attemptsOf(u), 0);
+  const activeUsers = users.filter((u) => attemptsOf(u) > 0).length;
+  const pct = (n) => Math.round(n || 0) + "%";
+
+  root.appendChild(el("div", { class: "stat-cards" }, [
+    el("div", { class: "stat-card" }, [el("div", { class: "sc-ic" }, "👥"), el("div", {}, [el("div", { class: "sc-val" }, String(users.length)), el("div", { class: "sc-lbl" }, "Total user")])]),
+    el("div", { class: "stat-card" }, [el("div", { class: "sc-ic" }, "✅"), el("div", {}, [el("div", { class: "sc-val" }, String(activeUsers)), el("div", { class: "sc-lbl" }, "Pernah tryout")])]),
+    el("div", { class: "stat-card" }, [el("div", { class: "sc-ic" }, "📝"), el("div", {}, [el("div", { class: "sc-val" }, String(totalAttempts)), el("div", { class: "sc-lbl" }, "Total percobaan")])]),
+  ]));
+
+  const search = el("input", { type: "text", placeholder: "Cari email user…", style: "max-width:340px;margin:4px 0 20px" });
+  root.appendChild(search);
+  const listWrap = el("div", {});
+  root.appendChild(listWrap);
+
+  function userCard(u) {
+    const recs = u.records || {};
+    const pids = Object.keys(recs);
+    const n = attemptsOf(u);
+    const head = el("div", { style: "display:flex;align-items:center;gap:10px;flex-wrap:wrap" }, [
+      el("h3", { style: "margin:0;font-size:16px" }, u.email),
+      el("span", { class: "role-badge " + (u.role === "admin" ? "admin" : "user") }, u.role.toUpperCase()),
+      el("span", { class: "chip" }, n ? `${n}× tryout` : "belum tryout"),
+    ]);
+    const card = el("div", { class: "card", style: "margin-bottom:16px" }, [head]);
+    if (!pids.length) { card.appendChild(el("div", { class: "q-meta", style: "margin-top:8px" }, "Belum mengerjakan tryout.")); return card; }
+    pids.sort((a, b) => (recs[b].attempts || 0) - (recs[a].attempts || 0));
+    const table = el("table", { class: "subj", style: "margin-top:12px" });
+    table.appendChild(el("tr", {}, ["Paket", "Rekor", "Skor terakhir", "Percobaan", "Terakhir"].map((h) => el("th", {}, h))));
+    pids.forEach((pid) => {
+      const r = recs[pid];
+      const hist = r.history || [];
+      const last = hist[hist.length - 1];
+      const bestTxt = r.best ? `${r.best.score} · ${pct(r.best.pct)}` : "—";
+      const lastTxt = last ? `${last.score} · ${pct(last.pct)}` : (r.lastScore != null ? String(r.lastScore) : "—");
+      const lastDate = last ? fmtDate(last.date) : (r.best ? fmtDate(r.best.date) : "—");
+      table.appendChild(el("tr", {}, [
+        el("td", {}, pkgName[pid] || el("span", { class: "q-meta" }, "(paket dihapus)")),
+        el("td", {}, el("strong", {}, bestTxt)),
+        el("td", {}, lastTxt),
+        el("td", {}, String(r.attempts || hist.length || 0)),
+        el("td", {}, lastDate),
+      ]));
+      if (hist.length) {
+        const det = el("details", { class: "bank-materi" }, [el("summary", {}, `Riwayat ${hist.length} percobaan`)]);
+        const ht = el("table", { class: "subj" });
+        ht.appendChild(el("tr", {}, ["#", "Tanggal", "Skor", "Benar/Salah/Kosong", "Durasi"].map((h) => el("th", {}, h))));
+        hist.slice().reverse().forEach((h, i) => {
+          ht.appendChild(el("tr", {}, [
+            el("td", {}, String(hist.length - i)),
+            el("td", {}, fmtDate(h.date)),
+            el("td", {}, `${h.score} · ${pct(h.pct)}`),
+            el("td", {}, `${h.correct}/${h.wrong}/${h.empty}`),
+            el("td", {}, h.durationMs ? fmtDur(h.durationMs) : "—"),
+          ]));
+        });
+        det.appendChild(el("div", { class: "bank-materi-body" }, [ht]));
+        table.appendChild(el("tr", {}, [el("td", { colspan: "5", style: "padding:0 12px 12px" }, det)]));
+      }
+    });
+    card.appendChild(table);
+    return card;
+  }
+
+  function paint() {
+    const q = search.value.trim().toLowerCase();
+    const sorted = users
+      .filter((u) => !q || u.email.toLowerCase().includes(q))
+      .sort((a, b) => attemptsOf(b) - attemptsOf(a) || a.email.localeCompare(b.email));
+    listWrap.innerHTML = "";
+    if (!sorted.length) { listWrap.appendChild(emptyState("🔍", "Tak ada user cocok", "Coba kata kunci lain.")); return; }
+    sorted.forEach((u) => listWrap.appendChild(userCard(u)));
+  }
+  search.addEventListener("input", paint);
+  paint();
 }
 
 /* ---------- Tema gelap/terang ---------- */
