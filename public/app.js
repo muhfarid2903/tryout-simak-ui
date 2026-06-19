@@ -2414,6 +2414,7 @@ function progressData() {
   return {
     records: store.records || {}, achievements: store.achievements || {},
     qstats: store.qstats || {}, bookmarks: store.bookmarks || {}, practiceLog: store.practiceLog || [],
+    calib: store.calib || {}, settings: store.settings || {},
   };
 }
 function applyContent(data) {
@@ -2428,6 +2429,8 @@ function applyProgress(data, updatedAt) {
   store.qstats = data.qstats || {};
   store.bookmarks = data.bookmarks || {};
   store.practiceLog = data.practiceLog || [];
+  if (data.calib) store.calib = data.calib;
+  if (data.settings) store.settings = data.settings;
   store._updatedAt = updatedAt || 0;
   normalizeStore(store); cacheStore();
 }
