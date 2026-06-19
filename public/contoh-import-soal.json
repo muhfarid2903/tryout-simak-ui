@@ -22,7 +22,8 @@
       "text": "Sinonim kata RELEVAN adalah ...",
       "options": ["Bertautan", "Acuh", "Ragu", "Sepadan", "Berbeda"],
       "answer": "A",
-      "pembahasan": "Relevan berarti berkaitan/bertautan dengan persoalan. Jawaban: A."
+      "pembahasan": "Relevan berarti berkaitan/bertautan dengan persoalan. Jawaban: A.",
+      "optExplain": ["Tepat — relevan = bertautan dengan persoalan.", "Acuh = tak peduli, beda makna.", "Ragu tidak terkait makna 'relevan'.", "Sepadan = setara, bukan sinonim utama.", "Berbeda justru lawan arah."]
     },
     {
       "packageId": "paket-contoh",

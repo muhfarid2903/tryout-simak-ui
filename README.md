@@ -8,9 +8,11 @@ Buka file **`index.html`** dengan klik dua kali (atau klik kanan → Open With �
 ## Fitur
 - **Tampilan modern (baru)** — **mode gelap/terang** (tombol 🌙/☀️ di kanan atas, mengikuti preferensi sistem & tersimpan otomatis), **responsif penuh di HP** (navigasi bisa di-geser, tata letak menyesuaikan layar kecil), serta animasi & efek halus pada kartu/tombol.
 - **Beranda** — daftar paket tryout, klik *Mulai Tryout*.
-- **Latihan (baru)** — mode latihan **tanpa batas waktu** dengan **umpan balik & pembahasan langsung** tiap soal. Soal dipilih cerdas (spaced repetition): yang sering salah / belum dikuasai didahulukan. Pilihan mode: **Soal yang salah**, **Soal ditandai (bookmark ★)**, **Campur cerdas**, atau **per mata uji**. Bisa bintangi soal sulit (★) untuk dilatih ulang — termasuk dari halaman pembahasan hasil.
+- **Latihan (baru)** — mode latihan **tanpa batas waktu** dengan **umpan balik & pembahasan langsung** tiap soal. Soal dipilih cerdas (spaced repetition): yang sering salah / belum dikuasai didahulukan. Pilihan mode: **Review hari ini** (soal yang sudah jatuh tempo dijadwalkan ulang), **Soal yang salah**, **Soal ditandai (bookmark ★)**, **Campur cerdas**, **Soal baru** (belum pernah dicoba), atau **per mata uji**. Bisa bintangi soal sulit (★) untuk dilatih ulang — termasuk dari halaman pembahasan hasil.
+- **Spaced repetition sungguhan (baru)** — tiap soal punya **jadwal review** (gaya SM-2): dijawab benar → muncul lagi makin jarang (1 hari → 3 hari → makin panjang); salah/kosong → langsung **jatuh tempo lagi hari ini**. Beranda menampilkan banner **“Review hari ini: N soal”**, dan Statistik punya kartu **Jadwal Review** dengan perkiraan 7 hari ke depan. Membantu materi melekat di ingatan jangka panjang, bukan sekadar hafalan sesaat.
+- **Mode kalibrasi keyakinan (baru, metakognisi)** — saat latihan, setelah memilih jawaban kamu menilai keyakinan: **💪 Yakin / 🤔 Ragu / 🎲 Tebak** (klik atau tombol `Y`/`R`/`T`) sebelum kunci terbuka. Aplikasi mencocokkan rasa yakin dengan kebenaran jawaban, lalu di Statistik muncul kartu **Kalibrasi Keyakinan** + wawasan otomatis (mis. *“saat 'Yakin' kamu benar 40% — cenderung terlalu percaya diri”*). Melatih kesadaran diri: tahu apa yang benar-benar dikuasai vs sekadar merasa tahu. Bisa dimatikan lewat toggle di halaman Latihan.
 - **Rumus matematika & gambar (baru)** — tulis rumus dengan mengapit `$...$` (mis. `$\frac{a}{b}$`, `$x^2$`, `$\sqrt{x}$`, `$\pi$`, `$\leq$`) — langsung tampil rapi di soal, pilihan, & pembahasan, **tanpa internet/instalasi**. Klik gambar soal untuk **memperbesar (zoom)**.
-- **Statistik (baru)** — dashboard belajar: **streak hari beruntun**, jumlah tryout, **akurasi keseluruhan**, jumlah soal dikerjakan, **penguasaan per mata uji** (bar akurasi + waktu rata-rata per soal, terlemah di atas dengan tombol *Latih*), dan **tren skor** per paket dalam grafik. Saat ujian, **waktu per soal** ikut terekam dan muncul di rincian hasil.
+- **Statistik (baru)** — dashboard belajar: **streak hari beruntun**, **review jatuh tempo hari ini**, **akurasi keseluruhan**, jumlah soal dikerjakan, **Jadwal Review** (perkiraan soal jatuh tempo 7 hari ke depan + tombol mulai review), **penguasaan per mata uji** (bar akurasi + waktu rata-rata per soal, terlemah di atas dengan tombol *Latih*), dan **tren skor** per paket dalam grafik. Saat ujian, **waktu per soal** ikut terekam dan muncul di rincian hasil.
 - **Dua mode waktu (dipilih per paket):**
   - **Per mata uji (sesi terpisah & terkunci)** — tiap mata uji punya waktu sendiri; begitu pindah sesi tidak bisa kembali ke mata uji sebelumnya (seperti CBT SIMAK UI Pascasarjana).
   - **Satu timer global** — semua soal dalam satu waktu total, bebas berpindah antar mata uji.
@@ -18,7 +20,8 @@ Buka file **`index.html`** dengan klik dua kali (atau klik kanan → Open With �
 - **Mode ujian** — timer mundur, navigasi soal, tandai ragu-ragu, auto-submit saat waktu habis / waktu sesi habis.
   - **Pintasan keyboard:** `1`–`5` atau `A`–`E` untuk memilih jawaban, `←`/`→` pindah soal, `F` tandai ragu-ragu.
   - **Tahan reload:** progres tryout otomatis tersimpan, jadi jika halaman ter-refresh / tab tertutup tak sengaja, tryout dilanjutkan dari posisi terakhir (timer tetap berjalan sesuai waktu nyata).
-- **Input Soal** — buat paket, atur mode waktu & durasi tiap mata uji, tambah/edit/hapus soal. Soal langsung muncul di tryout.
+- **Umpan balik per-distraktor (baru)** — selain pembahasan umum, tiap pilihan jawaban bisa diberi **catatan kenapa salah** (atau kenapa benar). Saat kunci terbuka di Latihan & di review Hasil, catatan muncul tepat di bawah pilihan terkait (garis hijau untuk kunci, merah untuk distraktor) — jadi kamu paham *mengapa* opsi lain keliru, bukan sekadar tahu yang benar. Diisi di form Input Soal (kolom catatan di tiap pilihan) atau lewat field `optExplain` saat import.
+- **Input Soal** — buat paket, atur mode waktu & durasi tiap mata uji, tambah/edit/hapus soal, plus **catatan per pilihan** untuk umpan balik kenapa salah. Soal langsung muncul di tryout.
 - **Bank Soal** — lihat semua soal beserta kuncinya.
 - **Materi** — bukan sekadar ringkasan, tapi bahan belajar lengkap untuk tiap mata uji, terbagi dua bagian:
   - **Pengetahuan Dasar & Cara Belajar** — skill apa yang diuji, fondasi yang wajib dikuasai (mis. untuk Bahasa Inggris: parts of speech, tenses, agreement, articles, prepositions, clauses, conditionals; serta fondasi kosakata: akar kata, prefiks/sufiks, word family, Academic Word List), cara meningkatkan vocabulary/grammar, dan contoh rencana belajar.
@@ -57,6 +60,7 @@ File import berupa **JSON** berisi satu objek dengan dua array: `packages` dan `
 | `answer` | ya | Kunci jawaban. Boleh huruf `"A"`–`"E"` **atau** angka indeks `0`–`4` (0 = A). |
 | `image` | tidak | URL gambar soal (opsional). |
 | `pembahasan` | tidak | Penjelasan jawaban (opsional). |
+| `optExplain` | tidak | Array sejajar dengan `options` — catatan kenapa tiap pilihan salah/benar (umpan balik per-distraktor). Indeks kosong (`""`) = tanpa catatan. |
 
 ### Contoh minimal
 ```json
@@ -68,7 +72,8 @@ File import berupa **JSON** berisi satu objek dengan dua array: `packages` dan `
       "text": "Sinonim RELEVAN adalah ...",
       "options": ["Bertautan", "Acuh", "Ragu", "Sepadan", "Berbeda"],
       "answer": "A",
-      "pembahasan": "Relevan = berkaitan/bertautan."
+      "pembahasan": "Relevan = berkaitan/bertautan.",
+      "optExplain": ["Tepat — relevan = bertautan.", "Acuh = tak peduli, beda makna.", "Ragu tidak terkait makna 'relevan'.", "Sepadan = setara, bukan sinonim utama.", "Berbeda justru lawan arah."]
     }
   ]
 }

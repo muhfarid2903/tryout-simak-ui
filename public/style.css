@@ -234,6 +234,13 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--ui-yellow);
 .choice.selected .key { background: var(--ui-yellow); color: var(--brand-dark); }
 .choice .ctext { white-space: pre-wrap; }
 
+/* Umpan balik per-distraktor */
+.opt-note { margin: -6px 0 10px 40px; font-size: 13px; color: var(--ui-ink-soft); border-left: 3px solid var(--border); padding: 3px 0 3px 10px; white-space: pre-wrap; }
+.opt-note.wrong { border-left-color: var(--red); }
+.opt-note.correct { border-left-color: var(--green); }
+.option-row-group { margin-bottom: 10px; }
+.opt-explain-input { margin: 4px 0 0 40px !important; width: calc(100% - 40px) !important; font-size: 13px; }
+
 .nav-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 12px 0 16px; }
 .nav-cell {
   aspect-ratio: 1/1; border: 1px solid var(--border); border-radius: 8px;
