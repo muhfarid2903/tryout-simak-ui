@@ -10,6 +10,7 @@ const OPT_KEYS = ["A", "B", "C", "D", "E"];
 const SCORE = { correct: 4, wrong: -1, empty: 0 };
 const PRESET_SUBJECTS = ["Kemampuan Verbal", "Kemampuan Kuantitatif", "Kemampuan Penalaran", "Bahasa Inggris"];
 const DEFAULT_SECTION_MIN = 30;
+const SRS_DAY = 86400000; // 1 hari dalam ms (penjadwalan spaced repetition)
 
 /* Materi pembelajaran per jenis soal (mata uji). Ditautkan ke nama subject. */
 const MATERI = {
@@ -451,6 +452,9 @@ function normalizeStore(s) {
   s.qstats = s.qstats || {};         // statistik per soal: { seen, correct, wrong, empty, lastResult, lastSeen, timeMs }
   s.bookmarks = s.bookmarks || {};   // soal ditandai: { qId: timestamp }
   s.practiceLog = s.practiceLog || []; // timestamp tiap sesi latihan (untuk streak)
+  s.settings = s.settings || {};
+  if (s.settings.calibrate == null) s.settings.calibrate = true; // mode rating keyakinan
+  s.calib = s.calib || { sure: { n: 0, correct: 0 }, unsure: { n: 0, correct: 0 }, guess: { n: 0, correct: 0 } };
   if (s._updatedAt == null) s._updatedAt = 0; // penanda versi untuk sinkron antar perangkat
   s.packages.forEach(p => {
     if (!p.mode) p.mode = "sections";
@@ -459,6 +463,7 @@ function normalizeStore(s) {
     if (p.shuffleQuestions == null) p.shuffleQuestions = true;
     if (p.shuffleOptions == null) p.shuffleOptions = true;
   });
+  Object.values(s.qstats).forEach(migrateSrs); // beri jadwal SRS pada data lama
   return s;
 }
 
@@ -608,7 +613,84 @@ function recordQStat(qId, outcome, timeMs) {
   st.lastResult = outcome;
   st.lastSeen = Date.now();
   st.timeMs += timeMs || 0;
+  scheduleSrs(st, outcome);
   store.qstats[qId] = st;
+}
+
+// Kalibrasi keyakinan (metakognisi): cocokkan rasa yakin dengan kebenaran jawaban.
+const CONF_META = { sure: { label: "Yakin", icon: "💪" }, unsure: { label: "Ragu", icon: "🤔" }, guess: { label: "Tebak", icon: "🎲" } };
+function recordCalibration(conf, ok) {
+  const c = store.calib && store.calib[conf];
+  if (!c) return;
+  c.n++; if (ok) c.correct++;
+}
+
+/* ---------- Spaced repetition: penjadwalan review nyata (gaya SM-2 ringan) ----------
+   Tiap soal menyimpan jadwal: ease (faktor kemudahan), reps (benar beruntun),
+   interval (hari sampai review berikutnya), due (timestamp jatuh tempo).
+   Benar  → interval membesar (1 hari → 3 hari → interval × ease) → due makin jauh.
+   Salah/kosong → reset, jatuh tempo lagi hari ini agar segera diulang. */
+function endOfToday() { const d = new Date(); d.setHours(23, 59, 59, 999); return d.getTime(); }
+function scheduleSrs(st, outcome) {
+  st.ease = st.ease || 2.5;
+  st.reps = st.reps || 0;
+  st.interval = st.interval || 0;
+  if (outcome === "correct") {
+    st.reps += 1;
+    if (st.reps === 1) st.interval = 1;
+    else if (st.reps === 2) st.interval = 3;
+    else st.interval = Math.max(1, Math.round(st.interval * st.ease));
+    st.ease = Math.min(2.8, st.ease + 0.1);
+    st.due = Date.now() + st.interval * SRS_DAY;
+  } else { // wrong / empty → ulangi hari ini
+    st.reps = 0;
+    st.interval = 0;
+    st.ease = Math.max(1.3, st.ease - (outcome === "wrong" ? 0.2 : 0.15));
+    st.due = Date.now();
+  }
+}
+// Migrasi data lama (qstats tanpa jadwal) → beri due awal yang masuk akal.
+function migrateSrs(st) {
+  if (st.due != null) return;
+  st.ease = 2.5; st.reps = 0; st.interval = 0;
+  if (st.lastResult === "correct" && st.correct > st.wrong) {
+    st.reps = Math.min(4, st.correct - st.wrong);
+    st.interval = st.reps >= 2 ? 3 : 1;
+    st.due = (st.lastSeen || Date.now()) + st.interval * SRS_DAY;
+  } else {
+    st.due = Date.now(); // belum dikuasai → perlu diulang sekarang
+  }
+}
+function isDue(qId) { const st = store.qstats[qId]; return !!(st && st.due != null && st.due <= endOfToday()); }
+// Soal yang sudah pernah dikerjakan & jatuh tempo untuk diulang hari ini (terurut prioritas).
+function dueQuestionIds(pkgId) {
+  return store.questions
+    .filter(q => (!pkgId || q.packageId === pkgId) && isDue(q.id))
+    .map(q => q.id)
+    .sort((a, b) => srsPriority(b) - srsPriority(a));
+}
+// Soal yang belum pernah dikerjakan sama sekali.
+function newQuestionIds(pkgId) {
+  return store.questions
+    .filter(q => (!pkgId || q.packageId === pkgId) && !(store.qstats[q.id] && store.qstats[q.id].seen))
+    .map(q => q.id);
+}
+// Perkiraan jumlah soal jatuh tempo beberapa hari ke depan (untuk grafik jadwal).
+// Indeks 0 = hari ini (termasuk yang sudah lewat jatuh tempo), 1 = besok, dst.
+function srsForecast(days = 7) {
+  const out = [];
+  const today = endOfToday();
+  for (let i = 0; i < days; i++) {
+    const upper = today + i * SRS_DAY;
+    const lower = i === 0 ? -Infinity : today + (i - 1) * SRS_DAY;
+    let n = 0;
+    store.questions.forEach(q => {
+      const st = store.qstats[q.id];
+      if (st && st.due != null && st.due > lower && st.due <= upper) n++;
+    });
+    out.push(n);
+  }
+  return out;
 }
 function dayKey(ts) { const d = new Date(ts); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
 function activityDays() {
@@ -663,6 +745,10 @@ function srsPriority(qId) {
   const days = (Date.now() - st.lastSeen) / 86400000;
   p += Math.min(25, days * 3);
   if (st.correct >= 2 && st.lastResult === "correct" && st.wrong === 0) p -= 30; // sudah dikuasai
+  if (st.due != null) { // dahulukan yang sudah jatuh tempo, tunda yang belum
+    const overdue = (Date.now() - st.due) / SRS_DAY;
+    p += overdue >= 0 ? Math.min(40, 20 + overdue * 4) : Math.max(-40, overdue * 4);
+  }
   return p;
 }
 // Soal yang masih sering salah / belum dikuasai.
@@ -859,6 +945,23 @@ function renderHome() {
           el("button", { class: "btn primary", onclick: () => go("input") }, "+ Buat Paket"))
       : emptyState("📦", "Belum ada paket tryout", "Admin belum mengunggah paket soal. Cek lagi nanti ya."));
     return;
+  }
+
+  // Banner spaced repetition: soal yang jatuh tempo diulang hari ini.
+  const dueIds = dueQuestionIds(), newIds = newQuestionIds();
+  if (dueIds.length || newIds.length) {
+    root.appendChild(el("div", { class: "focus-banner" }, [
+      el("span", { class: "rb-icon" }, dueIds.length ? "📅" : "✨"),
+      el("div", { style: "flex:1" }, [
+        el("strong", {}, dueIds.length ? `Review hari ini: ${dueIds.length} soal` : "Tidak ada review jatuh tempo 🎉"),
+        el("div", { style: "font-size:13px" }, dueIds.length
+          ? `Soal yang sudah waktunya diulang agar tetap melekat di ingatan.${newIds.length ? ` Plus ${newIds.length} soal baru menanti.` : ""}`
+          : (newIds.length ? `Ada ${newIds.length} soal baru yang belum kamu coba.` : "Semua soal terjadwal — mantap!")),
+      ]),
+      dueIds.length
+        ? el("button", { class: "btn sm primary", onclick: () => startPractice("due", { title: "Review hari ini" }) }, "Mulai review")
+        : (newIds.length ? el("button", { class: "btn sm primary", onclick: () => startPractice("new", { title: "Soal baru" }) }, "Coba soal baru") : null),
+    ]));
   }
 
   const grid = el("div", { class: "grid" });
@@ -1808,6 +1911,20 @@ function barChart(pcts, labels) {
   });
   return wrap;
 }
+// Grafik jumlah soal (bukan persen) — dipakai untuk jadwal review SRS.
+function countChart(counts, labels) {
+  const max = Math.max(1, ...counts);
+  const wrap = el("div", { class: "bar-chart" });
+  counts.forEach((n, i) => {
+    const h = n === 0 ? 2 : Math.max(8, Math.round((n / max) * 100));
+    wrap.appendChild(el("div", { class: "bar-col", title: labels[i] + " · " + n + " soal" }, [
+      el("div", { class: "bar-val" }, String(n)),
+      el("div", { class: "bar" }, [el("div", { class: "bar-fill " + (i === 0 && n > 0 ? "mid" : "good"), style: `height:${h}%` })]),
+      el("div", { class: "bar-x" }, labels[i]),
+    ]));
+  });
+  return wrap;
+}
 function renderStats() {
   const root = app();
   root.innerHTML = "";
@@ -1829,12 +1946,56 @@ function renderStats() {
     return;
   }
 
+  const dueNow = dueQuestionIds().length;
   root.appendChild(el("div", { class: "stat-cards" }, [
     statCard("🔥", streak, "hari beruntun"),
-    statCard("📝", totalAttempts, "tryout selesai"),
+    statCard("📅", dueNow, "review hari ini"),
     statCard("🎯", overallAcc == null ? "–" : overallAcc + "%", "akurasi keseluruhan"),
     statCard("📚", sumSeen, "soal dikerjakan"),
   ]));
+
+  // ----- Jadwal review (spaced repetition) -----
+  if (sumSeen > 0) {
+    const forecast = srsForecast(7);
+    const labels = ["Hari ini", "Besok", "+2h", "+3h", "+4h", "+5h", "+6h"];
+    const card = el("div", { class: "card", style: "margin-bottom:18px" }, [
+      el("h3", { style: "margin-top:0" }, "Jadwal Review (Spaced Repetition)"),
+      el("p", { class: "q-meta", style: "margin-top:0" }, dueNow
+        ? `${dueNow} soal jatuh tempo untuk diulang hari ini. Soal yang dijawab benar muncul lagi makin jarang; yang salah segera diulang.`
+        : "Tidak ada soal jatuh tempo hari ini — semua sudah terjadwal di hari berikutnya. 🎉"),
+      countChart(forecast, labels),
+    ]);
+    if (dueNow) card.appendChild(el("div", { class: "btn-row", style: "margin-top:12px" }, [
+      el("button", { class: "btn sm primary", onclick: () => startPractice("due", { title: "Review hari ini" }) }, `Mulai review ${dueNow} soal`),
+    ]));
+    root.appendChild(card);
+  }
+
+  // ----- Kalibrasi keyakinan (metakognisi) -----
+  const cal = store.calib, totalCal = cal.sure.n + cal.unsure.n + cal.guess.n;
+  if (totalCal >= 5) {
+    const accOf = c => c.n ? Math.round((c.correct / c.n) * 100) : null;
+    const sureAcc = accOf(cal.sure), guessAcc = accOf(cal.guess);
+    let insight = "Kalibrasimu cukup baik — tingkat keyakinan sejalan dengan hasil. Pertahankan!";
+    if (sureAcc != null && cal.sure.n >= 5 && sureAcc < 80)
+      insight = `Kamu cenderung terlalu percaya diri: saat merasa "Yakin" kamu benar ${sureAcc}%. Biasakan cek ulang sebelum mengunci jawaban.`;
+    else if (guessAcc != null && cal.guess.n >= 5 && guessAcc >= 60)
+      insight = `Tebakanmu sering tepat (${guessAcc}%) — intuisimu bagus. Perkuat dasarnya agar berubah jadi "Yakin".`;
+    const card = el("div", { class: "card", style: "margin-bottom:18px" }, [
+      el("h3", { style: "margin-top:0" }, "Kalibrasi Keyakinan"),
+      el("p", { class: "q-meta", style: "margin-top:0" }, "Seberapa cocok rasa yakinmu dengan kebenaran jawaban — inti dari belajar menyadari apa yang benar-benar kamu kuasai."),
+    ]);
+    [["sure", "💪 Yakin"], ["unsure", "🤔 Ragu"], ["guess", "🎲 Tebak"]].forEach(([k, lbl]) => {
+      const c = cal[k], a = accOf(c), tone = accTone(a);
+      card.appendChild(el("div", { class: "mastery-row" }, [
+        el("div", { class: "mr-head" }, [el("strong", {}, lbl), el("span", { class: "mr-acc " + tone }, a == null ? "–" : a + "%")]),
+        el("div", { class: "meter" }, [el("div", { class: "meter-fill " + tone, style: `width:${a || 0}%` })]),
+        el("div", { class: "mr-meta" }, [el("span", {}, `${c.correct} benar / ${c.n} jawaban`)]),
+      ]));
+    });
+    card.appendChild(el("div", { class: "focus-banner", style: "margin-top:12px" }, [el("span", { class: "rb-icon" }, "🧭"), el("div", { style: "flex:1;font-size:13px" }, insight)]));
+    root.appendChild(card);
+  }
 
   // ----- Penguasaan per mata uji (terlemah di atas) -----
   const mastery = subjectMastery().filter(m => m.attempts > 0).sort((a, b) => (a.accuracy ?? 999) - (b.accuracy ?? 999));
@@ -1917,12 +2078,23 @@ function renderPractice() {
     return;
   }
 
+  const cb = el("input", { type: "checkbox" });
+  cb.checked = store.settings.calibrate !== false;
+  cb.addEventListener("change", () => { store.settings.calibrate = cb.checked; saveStore(); });
+  root.appendChild(el("label", { style: "display:flex;align-items:center;gap:8px;cursor:pointer;margin:-4px 0 14px;font-size:14px" }, [
+    cb, el("span", {}, "🧭 Mode kalibrasi — nilai keyakinanmu (Yakin/Ragu/Tebak) tiap soal untuk melatih kesadaran diri"),
+  ]));
+
   const wrongN = weakQuestionIds().length;
   const bmN = Object.keys(store.bookmarks).length;
+  const dueN = dueQuestionIds().length;
+  const newN = newQuestionIds().length;
   const grid = el("div", { class: "grid" }, [
+    practiceCard("📅", "Review hari ini", dueN ? `${dueN} soal jatuh tempo` : "tidak ada yang jatuh tempo", dueN === 0, () => startPractice("due", { title: "Review hari ini" })),
     practiceCard("🎯", "Soal yang salah", `${wrongN} soal perlu diulang`, wrongN === 0, () => startPractice("wrong", { title: "Soal yang salah" })),
     practiceCard("★", "Soal ditandai", `${bmN} soal di-bookmark`, bmN === 0, () => startPractice("bookmark", { title: "Soal ditandai" })),
     practiceCard("🔀", "Campur cerdas", `${store.questions.length} soal · prioritas SRS`, false, () => startPractice("mix", { title: "Campur cerdas" })),
+    practiceCard("✨", "Soal baru", newN ? `${newN} soal belum dicoba` : "semua sudah dicoba", newN === 0, () => startPractice("new", { title: "Soal baru" })),
   ]);
   root.appendChild(grid);
 
@@ -1940,15 +2112,21 @@ function startPractice(mode, opts = {}) {
   let ids;
   if (mode === "wrong") ids = weakQuestionIds();
   else if (mode === "bookmark") ids = Object.keys(store.bookmarks);
+  else if (mode === "due") ids = dueQuestionIds();
+  else if (mode === "new") ids = newQuestionIds();
   else if (mode === "subject") ids = store.questions.filter(q => (q.subject || "Lainnya") === opts.subject).map(q => q.id);
   else ids = store.questions.map(q => q.id);
 
   let qs = ids.map(id => byId[id]).filter(Boolean);
   if (!qs.length) {
-    toast(mode === "wrong" ? "Belum ada soal salah untuk diulang 🎉" : mode === "bookmark" ? "Belum ada soal yang ditandai" : "Belum ada soal");
+    toast(mode === "wrong" ? "Belum ada soal salah untuk diulang 🎉"
+      : mode === "bookmark" ? "Belum ada soal yang ditandai"
+      : mode === "due" ? "Tidak ada soal jatuh tempo hari ini 🎉"
+      : mode === "new" ? "Semua soal sudah pernah kamu coba 👍"
+      : "Belum ada soal");
     return;
   }
-  qs = (mode === "subject" ? shuffle(qs) : qs.slice().sort((a, b) => srsPriority(b.id) - srsPriority(a.id)));
+  qs = (mode === "subject" || mode === "new") ? shuffle(qs) : qs.slice().sort((a, b) => srsPriority(b.id) - srsPriority(a.id));
   qs = qs.slice(0, 25);
   const prepared = qs.map(q => prepareQuestion(q, true));
   practiceState = {
@@ -1957,6 +2135,9 @@ function startPractice(mode, opts = {}) {
     answers: new Array(prepared.length).fill(null),
     revealed: new Array(prepared.length).fill(false),
     correct: 0, wrong: 0, startedAt: Date.now(), qStart: 0,
+    calibrate: store.settings.calibrate !== false,
+    pending: new Array(prepared.length).fill(null),
+    confidence: new Array(prepared.length).fill(null),
   };
   go("practice");
 }
@@ -1976,7 +2157,7 @@ function renderPracticeSession() {
   ]));
   root.appendChild(el("div", { class: "meter", style: "margin-bottom:14px" }, [el("div", { class: "meter-fill good", style: `width:${Math.round((answeredCount / ps.pool.length) * 100)}%` })]));
 
-  const revealed = ps.revealed[i], chosen = ps.answers[i];
+  const revealed = ps.revealed[i], chosen = ps.answers[i], pending = ps.pending[i];
   const card = el("div", { class: "card", id: "practiceMain" }, [
     el("div", { class: "q-meta", style: "display:flex;align-items:center;gap:8px" }, [
       q.subject ? el("span", { class: "tag" }, q.subject) : null, el("span", { style: "flex:1" }), bookmarkBtn(q.id),
@@ -1987,7 +2168,7 @@ function renderPracticeSession() {
   q.order.forEach((origIdx, displayIdx) => {
     let cls = "choice";
     if (revealed) { if (origIdx === q.answer) cls += " correct"; else if (displayIdx === chosen) cls += " wrong"; }
-    else if (displayIdx === chosen) cls += " selected";
+    else if (displayIdx === (ps.calibrate ? pending : chosen)) cls += " selected";
     const choice = el("div", { class: cls }, [
       el("div", { class: "key" }, OPT_KEYS[displayIdx]),
       el("div", { class: "ctext", html: renderMath(q.options[origIdx]) + (revealed && origIdx === q.answer ? "  ✓ kunci" : (revealed && displayIdx === chosen ? "  ✗ jawabanmu" : "")) }),
@@ -1995,35 +2176,65 @@ function renderPracticeSession() {
     if (!revealed) choice.addEventListener("click", () => answerPractice(displayIdx));
     card.appendChild(choice);
   });
+  if (revealed && ps.confidence[i]) {
+    const ok = q.order[chosen] === q.answer, cm = CONF_META[ps.confidence[i]];
+    card.appendChild(el("div", { class: "q-meta", style: "margin-top:12px;padding:8px 12px;border-radius:8px;background:var(--surface-soft)" },
+      `${cm.icon} Kamu merasa ${cm.label} — ${ok ? "dan benar ✅" : "tapi salah ❌"}.` +
+      (ps.confidence[i] === "sure" && !ok ? " Hati-hati terlalu percaya diri; cermati lagi soal seperti ini." :
+       ps.confidence[i] === "guess" && ok ? " Tebakan tepat — perkuat dasarnya agar lain kali yakin." : "")));
+  }
   if (revealed && q.pembahasan) card.appendChild(el("div", { class: "pembahasan" }, [el("strong", {}, "Pembahasan: "), el("span", { html: renderMath(q.pembahasan) })]));
 
   const lastQ = i === ps.pool.length - 1;
-  const row = el("div", { class: "btn-row", style: "margin-top:18px" });
   if (revealed) {
-    row.appendChild(el("span", { style: "flex:1" }));
-    row.appendChild(el("button", { class: "btn dark", onclick: () => lastQ ? finishPractice() : nextPractice() }, lastQ ? "Selesai →" : "Lanjut →"));
+    card.appendChild(el("div", { class: "btn-row", style: "margin-top:18px" }, [
+      el("span", { style: "flex:1" }),
+      el("button", { class: "btn dark", onclick: () => lastQ ? finishPractice() : nextPractice() }, lastQ ? "Selesai →" : "Lanjut →"),
+    ]));
+  } else if (ps.calibrate && pending != null) {
+    card.appendChild(el("div", { class: "q-meta", style: "margin-top:16px" }, "Seberapa yakin dengan jawaban ini?"));
+    card.appendChild(el("div", { class: "btn-row", style: "margin-top:8px" }, [
+      el("button", { class: "btn", onclick: () => pickConfidence("sure") }, "💪 Yakin (Y)"),
+      el("button", { class: "btn", onclick: () => pickConfidence("unsure") }, "🤔 Ragu (R)"),
+      el("button", { class: "btn", onclick: () => pickConfidence("guess") }, "🎲 Tebak (T)"),
+      el("span", { style: "flex:1" }),
+      el("button", { class: "btn sm", onclick: () => skipPractice() }, "Lewati →"),
+    ]));
   } else {
-    row.appendChild(el("div", { class: "q-meta", style: "align-self:center" }, "Pilih jawaban (atau tombol 1–5 / A–E) untuk melihat kunci & pembahasan."));
-    row.appendChild(el("span", { style: "flex:1" }));
-    row.appendChild(el("button", { class: "btn", onclick: () => skipPractice() }, "Lewati →"));
+    card.appendChild(el("div", { class: "btn-row", style: "margin-top:18px" }, [
+      el("div", { class: "q-meta", style: "align-self:center" }, ps.calibrate ? "Pilih jawaban (tombol 1–5 / A–E), lalu nilai keyakinanmu." : "Pilih jawaban (atau tombol 1–5 / A–E) untuk melihat kunci & pembahasan."),
+      el("span", { style: "flex:1" }),
+      el("button", { class: "btn", onclick: () => skipPractice() }, "Lewati →"),
+    ]));
   }
-  card.appendChild(row);
   root.appendChild(card);
 }
 function answerPractice(displayIdx) {
+  const ps = practiceState, i = ps.idx;
+  if (ps.revealed[i]) return;
+  if (ps.calibrate) { ps.pending[i] = displayIdx; renderPracticeSession(); } // tunggu rating keyakinan
+  else finalizeAnswer(displayIdx, null);
+}
+function pickConfidence(conf) {
+  const ps = practiceState, i = ps.idx;
+  if (ps.revealed[i] || ps.pending[i] == null) return;
+  finalizeAnswer(ps.pending[i], conf);
+}
+function finalizeAnswer(displayIdx, conf) {
   const ps = practiceState, i = ps.idx, q = ps.pool[i];
   if (ps.revealed[i]) return;
-  ps.answers[i] = displayIdx; ps.revealed[i] = true;
+  ps.answers[i] = displayIdx; ps.revealed[i] = true; ps.confidence[i] = conf;
   const ok = q.order[displayIdx] === q.answer;
   if (ok) ps.correct++; else ps.wrong++;
   recordQStat(q.id, ok ? "correct" : "wrong", Date.now() - (ps.qStart || Date.now()));
+  if (conf) recordCalibration(conf, ok);
   saveStore();
   renderPracticeSession();
 }
 function skipPractice() {
   const ps = practiceState, i = ps.idx, q = ps.pool[i];
   if (ps.revealed[i]) return;
-  ps.revealed[i] = true;
+  ps.revealed[i] = true; ps.pending[i] = null;
   recordQStat(q.id, "empty", Date.now() - (ps.qStart || Date.now()));
   saveStore();
   renderPracticeSession();
@@ -2105,6 +2316,9 @@ function handlePracticeKey(e) {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const key = e.key.toLowerCase();
   if (!ps.revealed[i]) {
+    if (ps.calibrate && ps.pending[i] != null && (key === "y" || key === "r" || key === "t")) {
+      e.preventDefault(); pickConfidence(key === "y" ? "sure" : key === "r" ? "unsure" : "guess"); return;
+    }
     let optIdx = -1;
     if (key >= "1" && key <= "5") optIdx = parseInt(key, 10) - 1;
     else { const li = ["a", "b", "c", "d", "e"].indexOf(key); if (li >= 0) optIdx = li; }
