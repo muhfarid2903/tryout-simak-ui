@@ -224,7 +224,7 @@ body {
 .sidebar-collapsed .sidebar { width: var(--sidebar-rail); }
 .sidebar-collapsed .brand-text,
 .sidebar-collapsed .theme-label { display: none; }
-.sidebar-collapsed .sidebar-head { justify-content: center; padding: 16px 0; }
+.sidebar-collapsed .sidebar-head { flex-direction: column; justify-content: center; gap: 10px; padding: 16px 0; min-height: auto; }
 .sidebar-collapsed .sidebar-collapse { margin-left: 0; transform: rotate(180deg); }
 .sidebar-collapsed .mainnav { padding: 8px; align-items: center; }
 .sidebar-collapsed .navbtn { justify-content: center; padding: 10px 0; width: 48px; }
