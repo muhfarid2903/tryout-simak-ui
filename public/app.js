@@ -1328,71 +1328,101 @@ function subjectCounts() {
   return counts;
 }
 
-function materiCard(subject, count) {
+// Satu butir accordion (judul + isi yang dibangun lewat callback). Tertutup secara default.
+function materiAcc(title, build) {
+  const sum = el("summary", { class: "materi-acc-head" }, [el("span", { class: "materi-acc-title" }, title)]);
+  const body = el("div", { class: "materi-acc-body" });
+  build(body);
+  return el("details", { class: "materi-acc" }, [sum, body]);
+}
+
+// Konten satu mata uji: intro + accordion pengetahuan dasar + accordion topik soal.
+function materiContent(subject, count) {
   const m = MATERI[subject];
-  const head = el("summary", { class: "materi-head" }, [
+  const wrap = el("div", { class: "card materi-content" });
+  wrap.appendChild(el("div", { class: "materi-content-head" }, [
     el("span", { class: "materi-ic" }, m ? m.icon : "📘"),
-    el("span", { class: "materi-title" }, subject),
-    count != null ? el("span", { class: "chip yellow" }, `${count} soal`) : null,
-  ]);
+    el("div", { class: "materi-content-title" }, [
+      el("h3", {}, subject),
+      count != null ? el("span", { class: "chip yellow" }, `${count} soal`) : null,
+    ]),
+  ]));
 
-  const body = el("div", { class: "materi-body" });
-  if (m) {
-    body.appendChild(el("p", { class: "materi-intro" }, m.intro));
-
-    // Fondasi ilmu & cara belajar (pengetahuan dasar) — opsional per mata uji
-    if (m.guide && m.guide.length) {
-      body.appendChild(el("div", { class: "materi-section-label" }, "📚 Pengetahuan Dasar & Cara Belajar"));
-      m.guide.forEach(g => {
-        body.appendChild(el("h4", { class: "materi-topic" }, g.h));
-        if (g.body) body.appendChild(el("p", { class: "materi-guide-body" }, g.body));
-        if (g.points) body.appendChild(el("ul", { class: "materi-list" }, g.points.map(p => el("li", {}, p))));
-        if (g.example) body.appendChild(el("div", { class: "materi-example" }, [el("strong", {}, "Contoh: "), g.example]));
-      });
-      body.appendChild(el("div", { class: "materi-section-label" }, "🎯 Topik Soal & Strategi"));
-    }
-
-    m.topics.forEach(t => {
-      body.appendChild(el("h4", { class: "materi-topic" }, t.h));
-      body.appendChild(el("ul", { class: "materi-list" }, t.points.map(p => el("li", {}, p))));
-      if (t.example) body.appendChild(el("div", { class: "materi-example" }, [el("strong", {}, "Contoh soal: "), t.example]));
-    });
-  } else {
-    body.appendChild(el("p", { class: "materi-intro" },
+  if (!m) {
+    wrap.appendChild(el("p", { class: "materi-intro" },
       "Belum ada materi bawaan untuk jenis soal ini. Pelajari pola soalnya langsung di Bank Soal beserta kunci & pembahasan."));
+    if (count != null && count > 0)
+      wrap.appendChild(el("button", { class: "btn sm", style: "margin-top:8px", onclick: () => go("bank") }, "Lihat soal di Bank Soal →"));
+    return wrap;
   }
+
+  wrap.appendChild(el("p", { class: "materi-intro" }, m.intro));
+
+  if (m.guide && m.guide.length) {
+    wrap.appendChild(el("div", { class: "materi-section-label" }, "📚 Pengetahuan Dasar & Cara Belajar"));
+    m.guide.forEach(g => wrap.appendChild(materiAcc(g.h, body => {
+      if (g.body) body.appendChild(el("p", { class: "materi-guide-body" }, g.body));
+      if (g.points) body.appendChild(el("ul", { class: "materi-list" }, g.points.map(p => el("li", {}, p))));
+      if (g.example) body.appendChild(el("div", { class: "materi-example" }, [el("strong", {}, "Contoh: "), g.example]));
+    })));
+  }
+
+  wrap.appendChild(el("div", { class: "materi-section-label" }, "🎯 Topik Soal & Strategi"));
+  m.topics.forEach(t => wrap.appendChild(materiAcc(t.h, body => {
+    body.appendChild(el("ul", { class: "materi-list" }, t.points.map(p => el("li", {}, p))));
+    if (t.example) body.appendChild(el("div", { class: "materi-example" }, [el("strong", {}, "Contoh soal: "), t.example]));
+  })));
+
   if (count != null && count > 0) {
-    body.appendChild(el("div", { class: "btn-row", style: "margin-top:14px" }, [
+    wrap.appendChild(el("div", { class: "btn-row", style: "margin-top:16px" }, [
       el("button", { class: "btn sm", onclick: () => go("bank") }, "Lihat soal di Bank Soal →"),
     ]));
   }
-
-  return el("details", { class: "card materi-card", open: "" }, [head, body]);
+  return wrap;
 }
+
+let materiSubject = null; // mata uji yang sedang dibuka di tab Materi
 
 function renderMateri() {
   const root = app();
   root.innerHTML = "";
+  document.body.classList.remove("auth-screen");
   root.appendChild(el("h2", { class: "page-title" }, "Materi"));
-  root.appendChild(el("p", { class: "page-sub" }, "Ringkasan materi & strategi untuk tiap jenis soal yang ada di bank soalmu."));
+  root.appendChild(el("p", { class: "page-sub" }, "Pilih mata uji, lalu klik topik yang ingin kamu pelajari — penjelasan terbuka satu per satu, tanpa scroll panjang."));
 
   const counts = subjectCounts();
   const subjects = Object.keys(counts);
 
+  // Daftar mata uji yang ditampilkan beserta jumlah soalnya.
+  let list;
   if (subjects.length === 0) {
-    // Bank kosong → tampilkan seluruh materi bawaan sebagai panduan umum
-    root.appendChild(el("div", { class: "note", style: "margin-bottom:18px" },
-      "Bank soal masih kosong. Berikut materi umum jenis soal standar SIMAK UI. Tambahkan soal di menu Input Soal agar materi menyesuaikan jenis soalmu."));
-    Object.keys(MATERI).forEach(s => root.appendChild(materiCard(s, null)));
-    return;
+    root.appendChild(el("div", { class: "note", style: "margin-bottom:16px" },
+      "Bank soal masih kosong. Berikut materi umum jenis soal standar SIMAK UI."));
+    list = Object.keys(MATERI).map(s => ({ subject: s, count: null }));
+  } else {
+    const ordered = [
+      ...Object.keys(MATERI).filter(s => subjects.includes(s)),
+      ...subjects.filter(s => !MATERI[s]),
+    ];
+    list = ordered.map(s => ({ subject: s, count: counts[s] }));
   }
+  if (!list.length) return;
 
-  // Materi untuk jenis soal yang benar-benar ada (urut: preset dulu, lalu sisanya)
-  const ordered = [
-    ...Object.keys(MATERI).filter(s => subjects.includes(s)),
-    ...subjects.filter(s => !MATERI[s]),
-  ];
-  ordered.forEach(s => root.appendChild(materiCard(s, counts[s])));
+  // Pertahankan pilihan jika masih tersedia; jika tidak, ambil yang pertama.
+  if (!list.some(x => x.subject === materiSubject)) materiSubject = list[0].subject;
+
+  // Tab pemilih mata uji.
+  root.appendChild(el("div", { class: "materi-tabs" }, list.map(x => {
+    const m = MATERI[x.subject];
+    return el("button", {
+      class: "materi-tab" + (x.subject === materiSubject ? " active" : ""),
+      onclick: () => { materiSubject = x.subject; renderMateri(); window.scrollTo(0, 0); },
+    }, [el("span", { class: "mt-ic" }, m ? m.icon : "📘"), el("span", {}, x.subject)]);
+  })));
+
+  // Konten mata uji aktif.
+  const active = list.find(x => x.subject === materiSubject);
+  root.appendChild(materiContent(active.subject, active.count));
 }
 
 /* =========================================================================
