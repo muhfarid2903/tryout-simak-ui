@@ -710,11 +710,19 @@ function activityDays() {
 function computeStreak() {
   const days = activityDays();
   if (!days.size) return 0;
-  let streak = 0;
+  let streak = 0, graceUsed = false;
   const cur = new Date();
   // mulai dari hari ini; jika hari ini belum ada aktivitas, izinkan mulai dari kemarin
   if (!days.has(dayKey(cur.getTime()))) cur.setDate(cur.getDate() - 1);
-  while (days.has(dayKey(cur.getTime()))) { streak++; cur.setDate(cur.getDate() - 1); }
+  // Streak "ramah": satu hari bolong dimaafkan agar pengguna sibuk tak langsung kehilangan
+  // momentum. Dua hari kosong beruntun tetap memutus streak.
+  while (true) {
+    if (days.has(dayKey(cur.getTime()))) { streak++; cur.setDate(cur.getDate() - 1); }
+    else if (!graceUsed && streak > 0) {
+      graceUsed = true; cur.setDate(cur.getDate() - 1); // lewati 1 hari bolong (tak dihitung)
+      if (!days.has(dayKey(cur.getTime()))) break;      // dua hari kosong → streak putus
+    } else break;
+  }
   return streak;
 }
 // Peta id soal -> subject (untuk agregasi statistik per mata uji).
@@ -774,6 +782,41 @@ function weakQuestionIds() {
     if (!st || !st.seen) return false;
     return st.lastResult === "wrong" || st.lastResult === "empty" || st.wrong > st.correct;
   }).map(q => q.id);
+}
+// Soal "bandel" (leech): sudah dilihat cukup sering tapi tetap lebih sering salah dan
+// hasil terakhir belum benar. Latihan berulang tak produktif → arahkan baca materi.
+function isLeech(qId) {
+  const st = store.qstats[qId];
+  if (!st || st.seen < 3) return false;
+  const fails = (st.wrong || 0) + (st.empty || 0);
+  return fails >= 3 && fails > (st.correct || 0) && st.lastResult !== "correct";
+}
+function leechQuestionIds() {
+  return store.questions.filter(q => isLeech(q.id)).map(q => q.id)
+    .sort((a, b) => srsPriority(b) - srsPriority(a));
+}
+// Acuan waktu/soal satu mata uji (median rata-rata waktu per soal yg pernah dikerjakan).
+// Dipakai untuk klasifikasi error per-soal. 0 = data referensi belum cukup.
+function subjectTimeRef(subject) {
+  const times = [];
+  store.questions.forEach(q => {
+    if ((q.subject || "Lainnya") !== subject) return;
+    const st = store.qstats[q.id];
+    if (st && st.seen) times.push(st.timeMs / st.seen);
+  });
+  if (times.length < 3) return 0;
+  times.sort((a, b) => a - b);
+  return times[Math.floor(times.length / 2)];
+}
+// Klasifikasi satu jawaban SALAH (metakognisi / error analysis):
+// cepat & salah → kemungkinan ceroboh; selain itu → konsep belum kuat.
+// Mengembalikan null bila referensi waktu belum cukup.
+function errorKind(q, timeMs) {
+  const med = subjectTimeRef(q.subject || "Lainnya");
+  if (!med || !timeMs) return null;
+  if (timeMs <= med * 0.7)
+    return { icon: "⚡", label: "Cepat tapi salah — kemungkinan ceroboh", tip: "Baca soal & semua pilihan sampai tuntas sebelum mengunci jawaban." };
+  return { icon: "🐢", label: "Lambat & salah — konsepnya belum kuat", tip: "Buka materi mata uji ini, lalu ulangi soal serupa." };
 }
 function isBookmarked(qId) { return !!store.bookmarks[qId]; }
 function toggleBookmark(qId) {
@@ -1050,6 +1093,18 @@ function renderHome() {
 
   // Target belajar harian (cincin progres).
   root.appendChild(dailyGoalCard());
+
+  // Sesi kilat untuk pengguna sibuk: 7 soal prioritas (jatuh tempo + bandel + terlemah).
+  if (store.questions.length) {
+    root.appendChild(el("div", { class: "focus-banner", style: "margin-bottom:14px" }, [
+      el("span", { class: "rb-icon" }, "⚡"),
+      el("div", { style: "flex:1" }, [
+        el("strong", {}, "Review 5 menit"),
+        el("div", { style: "font-size:13px" }, "Sesi kilat: soal jatuh tempo, bandel, & terlemah — pas untuk sela waktu singkat."),
+      ]),
+      el("button", { class: "btn sm primary", onclick: () => startPractice("micro", { title: "Review 5 menit" }) }, "Mulai"),
+    ]));
+  }
 
   // Banner spaced repetition: soal yang jatuh tempo diulang hari ini.
   const dueIds = dueQuestionIds(), newIds = newQuestionIds();
@@ -2089,9 +2144,9 @@ function examHistoryAll() {
   Object.values(store.records).forEach(rec => (rec.history || []).forEach(h => all.push(h)));
   return all.sort((a, b) => a.date - b.date);
 }
-// Prediksi persentase skor ujian berikutnya dari riwayat (rata-rata berbobot terbaru + tren).
+// Prediksi persentase skor dari riwayat tryout penuh (rata-rata berbobot terbaru + tren).
 // pct di riwayat sudah memperhitungkan penalti tebakan (benar +4, salah -1) → mirip metrik SIMAK.
-function predictScore() {
+function predictScoreFromExams() {
   const hist = examHistoryAll();
   if (hist.length < 1) return null;
   const recent = hist.slice(-6);
@@ -2107,7 +2162,33 @@ function predictScore() {
   const mean = recent.reduce((a, h) => a + h.pct, 0) / recent.length;
   const sd = Math.sqrt(recent.reduce((a, h) => a + (h.pct - mean) ** 2, 0) / recent.length);
   const margin = Math.round(Math.max(4, sd) + (recent.length < 3 ? 6 : recent.length < 5 ? 3 : 0));
-  return { pred, lo: Math.max(0, pred - margin), hi: Math.min(100, pred + margin), n: hist.length, margin };
+  return { pred, lo: Math.max(0, pred - margin), hi: Math.min(100, pred + margin), n: hist.length, margin, source: "exam" };
+}
+// Estimasi skor dari latihan (qstats) — dipakai saat tryout penuh masih sedikit.
+// Akurasi p dipetakan ke skala skor SIMAK: per soal benar +4 / salah -1 (asumsi semua dijawab),
+// sehingga pct = (4p - (1-p)) / 4 = (5p - 1)/4 → dipersen. Margin lebih lebar (bukan kondisi ujian).
+function predictScoreFromPractice() {
+  let correct = 0, answered = 0;
+  Object.values(store.qstats).forEach(s => { correct += s.correct || 0; answered += (s.correct || 0) + (s.wrong || 0); });
+  if (answered < 20) return null; // butuh cukup data agar tidak menyesatkan
+  const p = correct / answered;
+  const pred = Math.max(0, Math.min(100, Math.round(125 * p - 25)));
+  const margin = answered < 50 ? 12 : answered < 120 ? 9 : 7;
+  return { pred, lo: Math.max(0, pred - margin), hi: Math.min(100, pred + margin), n: answered, margin, source: "practice" };
+}
+// Prediksi gabungan: utamakan tryout penuh (paling sahih); jatuh ke estimasi latihan bila kurang.
+function predictScore() {
+  const exams = examHistoryAll();
+  const fromEx = predictScoreFromExams();
+  const fromPr = predictScoreFromPractice();
+  if (exams.length >= 2) return fromEx;                 // tryout penuh cukup
+  if (exams.length === 1 && fromPr) {                   // 1 tryout → gabung dgn estimasi latihan
+    const pred = Math.round((fromEx.pred + fromPr.pred) / 2);
+    const margin = Math.max(fromEx.margin, fromPr.margin);
+    return { pred, lo: Math.max(0, pred - margin), hi: Math.min(100, pred + margin), n: fromPr.n, margin, source: "blend" };
+  }
+  if (fromPr) return fromPr;                             // belum tryout penuh → estimasi latihan
+  return fromEx;                                         // null bila benar-benar belum ada data
 }
 function readinessBand(pct) {
   if (pct >= 75) return { label: "Siap tempur", icon: "🚀", tone: "good" };
@@ -2173,7 +2254,12 @@ function renderStats() {
         el("span", { class: "chip " + (band.tone === "good" ? "" : "yellow"), style: "margin-left:auto" }, `${band.icon} ${band.label}`),
       ]),
       el("div", { class: "meter", style: "margin:10px 0" }, [el("div", { class: "meter-fill " + band.tone, style: `width:${pred.pred}%` })]),
-      el("p", { class: "q-meta", style: "margin:0" }, `Estimasi dari ${pred.n} ujian terakhir (terbaru paling berpengaruh). Skor sudah memperhitungkan penalti tebakan — ini estimasi internal, bukan skor resmi SIMAK.`),
+      el("p", { class: "q-meta", style: "margin:0" },
+        pred.source === "practice"
+          ? `Estimasi awal dari ${pred.n} jawaban latihan (dipetakan ke skala penalti +4/−1). Kerjakan tryout penuh untuk prediksi yang lebih akurat — ini estimasi internal, bukan skor resmi SIMAK.`
+          : pred.source === "blend"
+            ? `Gabungan 1 tryout penuh + ${pred.n} jawaban latihan. Tambah tryout penuh agar makin akurat — estimasi internal, bukan skor resmi SIMAK.`
+            : `Estimasi dari ${pred.n} ujian terakhir (terbaru paling berpengaruh). Skor sudah memperhitungkan penalti tebakan — ini estimasi internal, bukan skor resmi SIMAK.`),
     ]);
     if (foc && foc.gain >= 1) {
       card.appendChild(el("div", { class: "focus-banner", style: "margin:12px 0 0" }, [
@@ -2212,8 +2298,13 @@ function renderStats() {
       insight = `Kamu cenderung terlalu percaya diri: saat merasa "Yakin" kamu benar ${sureAcc}%. Biasakan cek ulang sebelum mengunci jawaban.`;
     else if (guessAcc != null && cal.guess.n >= 5 && guessAcc >= 60)
       insight = `Tebakanmu sering tepat (${guessAcc}%) — intuisimu bagus. Perkuat dasarnya agar berubah jadi "Yakin".`;
+    // Headline overconfidence: seberapa sering "Yakin" ternyata salah (gap = 100 − akurasi-Yakin).
+    const overconf = (sureAcc != null && cal.sure.n >= 5) ? 100 - sureAcc : null;
     const card = el("div", { class: "card", style: "margin-bottom:18px" }, [
-      el("h3", { style: "margin-top:0" }, "Kalibrasi Keyakinan"),
+      el("div", { style: "display:flex;align-items:baseline;gap:10px;flex-wrap:wrap" }, [
+        el("h3", { style: "margin:0" }, "Kalibrasi Keyakinan"),
+        overconf != null ? el("span", { class: "chip " + (overconf <= 20 ? "" : "yellow"), style: "margin-left:auto", title: "Seberapa sering jawaban yang kamu rasa 'Yakin' ternyata salah." }, `🧭 Overconfidence ${overconf}%`) : null,
+      ]),
     ]);
     [["sure", "💪 Yakin"], ["unsure", "🤔 Ragu"], ["guess", "🎲 Tebak"]].forEach(([k, lbl]) => {
       const c = cal[k], a = accOf(c), tone = accTone(a);
@@ -2361,9 +2452,12 @@ function renderPractice() {
   const bmN = Object.keys(store.bookmarks).length;
   const dueN = dueQuestionIds().length;
   const newN = newQuestionIds().length;
+  const leechN = leechQuestionIds().length;
   const grid = el("div", { class: "grid" }, [
+    practiceCard("⚡", "Review 5 menit", "sesi kilat · 7 soal prioritas", false, () => startPractice("micro", { title: "Review 5 menit" })),
     practiceCard("📅", "Review hari ini", dueN ? `${dueN} soal jatuh tempo` : "tidak ada yang jatuh tempo", dueN === 0, () => startPractice("due", { title: "Review hari ini" })),
     practiceCard("🎯", "Soal yang salah", `${wrongN} soal perlu diulang`, wrongN === 0, () => startPractice("wrong", { title: "Soal yang salah" })),
+    leechN ? practiceCard("🧯", "Soal bandel", `${leechN} soal sering salah · baca materi`, false, () => startPractice("leech", { title: "Soal bandel" })) : null,
     practiceCard("★", "Soal ditandai", `${bmN} soal di-bookmark`, bmN === 0, () => startPractice("bookmark", { title: "Soal ditandai" })),
     practiceCard("🔀", "Campur cerdas", `${store.questions.length} soal · prioritas SRS`, false, () => startPractice("mix", { title: "Campur cerdas" })),
     practiceCard("✨", "Soal baru", newN ? `${newN} soal belum dicoba` : "semua sudah dicoba", newN === 0, () => startPractice("new", { title: "Soal baru" })),
@@ -2386,6 +2480,13 @@ function startPractice(mode, opts = {}) {
   else if (mode === "bookmark") ids = Object.keys(store.bookmarks);
   else if (mode === "due") ids = dueQuestionIds();
   else if (mode === "new") ids = newQuestionIds();
+  else if (mode === "leech") ids = leechQuestionIds();
+  else if (mode === "micro") {
+    // Sesi kilat: gabungan jatuh tempo + bandel + terlemah; bila kurang, lengkapi soal baru.
+    const set = new Set([...dueQuestionIds(), ...leechQuestionIds(), ...weakQuestionIds()]);
+    if (set.size < 7) for (const id of newQuestionIds()) { set.add(id); if (set.size >= 7) break; }
+    ids = [...set];
+  }
   else if (mode === "subject") ids = store.questions.filter(q => (q.subject || "Lainnya") === opts.subject).map(q => q.id);
   else if (mode === "weakness") { const subs = new Set(weakestSubjects(3)); ids = store.questions.filter(q => subs.has(q.subject || "Lainnya")).map(q => q.id); }
   else ids = store.questions.map(q => q.id);
@@ -2396,12 +2497,14 @@ function startPractice(mode, opts = {}) {
       : mode === "bookmark" ? "Belum ada soal yang ditandai"
       : mode === "due" ? "Tidak ada soal jatuh tempo hari ini 🎉"
       : mode === "new" ? "Semua soal sudah pernah kamu coba 👍"
+      : mode === "leech" ? "Tidak ada soal bandel — kerja bagus! 🎉"
+      : mode === "micro" ? "Belum ada soal untuk direview. Coba kerjakan beberapa soal dulu 👍"
       : mode === "weakness" ? "Kerjakan beberapa soal dulu — kelemahanmu akan terdeteksi otomatis 👍"
       : "Belum ada soal");
     return;
   }
   qs = (mode === "subject" || mode === "new") ? shuffle(qs) : qs.slice().sort((a, b) => srsPriority(b.id) - srsPriority(a.id));
-  qs = qs.slice(0, 25);
+  qs = qs.slice(0, mode === "micro" ? 7 : 25);
   const prepared = qs.map(q => prepareQuestion(q, true));
   practiceState = {
     mode, subject: opts.subject || null, title: opts.title || "Latihan",
@@ -2412,6 +2515,7 @@ function startPractice(mode, opts = {}) {
     calibrate: store.settings.calibrate !== false,
     pending: new Array(prepared.length).fill(null),
     confidence: new Array(prepared.length).fill(null),
+    times: new Array(prepared.length).fill(0),
   };
   go("practice");
 }
@@ -2433,8 +2537,10 @@ function renderPracticeSession() {
 
   const revealed = ps.revealed[i], chosen = ps.answers[i], pending = ps.pending[i];
   const card = el("div", { class: "card", id: "practiceMain" }, [
-    el("div", { class: "q-meta", style: "display:flex;align-items:center;gap:8px" }, [
-      q.subject ? el("span", { class: "tag" }, q.subject) : null, el("span", { style: "flex:1" }), bookmarkBtn(q.id),
+    el("div", { class: "q-meta", style: "display:flex;align-items:center;gap:8px;flex-wrap:wrap" }, [
+      q.subject ? el("span", { class: "tag" }, q.subject) : null,
+      isLeech(q.id) ? el("span", { class: "chip yellow", title: "Soal ini sering kamu jawab salah — baca materinya, jangan cuma diulang." }, "🧯 Sering salah") : null,
+      el("span", { style: "flex:1" }), bookmarkBtn(q.id),
     ]),
     mathText("div", "q-text", q.text),
     q.image ? el("img", { class: "q-img", src: q.image, alt: "gambar soal", onerror: function () { this.style.display = "none"; } }) : null,
@@ -2457,6 +2563,12 @@ function renderPracticeSession() {
       `${cm.icon} Kamu merasa ${cm.label} — ${ok ? "dan benar ✅" : "tapi salah ❌"}.` +
       (ps.confidence[i] === "sure" && !ok ? " Hati-hati terlalu percaya diri; cermati lagi soal seperti ini." :
        ps.confidence[i] === "guess" && ok ? " Tebakan tepat — perkuat dasarnya agar lain kali yakin." : "")));
+  }
+  // Klasifikasi error per-soal: bantu user bedakan ceroboh vs konsep belum kuat.
+  if (revealed && chosen != null && q.order[chosen] !== q.answer) {
+    const ek = errorKind(q, ps.times[i]);
+    if (ek) card.appendChild(el("div", { class: "q-meta", style: "margin-top:12px;padding:8px 12px;border-radius:8px;background:var(--surface-soft)" },
+      `${ek.icon} ${ek.label}. ${ek.tip}`));
   }
   if (revealed && q.pembahasan) card.appendChild(el("div", { class: "pembahasan" }, [el("strong", {}, "Pembahasan: "), el("span", { html: renderMath(q.pembahasan) })]));
   if (revealed) { const sbPr = stepsBlock(q, true); if (sbPr) card.appendChild(sbPr); }
@@ -2499,10 +2611,11 @@ function pickConfidence(conf) {
 function finalizeAnswer(displayIdx, conf) {
   const ps = practiceState, i = ps.idx, q = ps.pool[i];
   if (ps.revealed[i]) return;
-  ps.answers[i] = displayIdx; ps.revealed[i] = true; ps.confidence[i] = conf;
+  const timeMs = Date.now() - (ps.qStart || Date.now());
+  ps.answers[i] = displayIdx; ps.revealed[i] = true; ps.confidence[i] = conf; ps.times[i] = timeMs;
   const ok = q.order[displayIdx] === q.answer;
   if (ok) ps.correct++; else ps.wrong++;
-  recordQStat(q.id, ok ? "correct" : "wrong", Date.now() - (ps.qStart || Date.now()));
+  recordQStat(q.id, ok ? "correct" : "wrong", timeMs);
   if (conf) recordCalibration(conf, ok);
   saveStore();
   renderPracticeSession();
