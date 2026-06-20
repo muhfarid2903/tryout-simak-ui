@@ -39,7 +39,8 @@
       "text": "Suku berikutnya dari deret 2, 5, 10, 17, ... adalah ...",
       "options": ["24", "26", "28", "30", "32"],
       "answer": 1,
-      "pembahasan": "Selisih bertambah ganjil: +3, +5, +7, +9 → 17 + 9 = 26. Jawaban: B."
+      "pembahasan": "Selisih bertambah ganjil: +3, +5, +7, +9 → 17 + 9 = 26. Jawaban: B.",
+      "steps": ["Cari pola selisih antar suku: 5-2=3, 10-5=5, 17-10=7.", "Selisih membentuk bilangan ganjil naik: 3, 5, 7, … → berikutnya 9.", "Suku berikutnya = 17 + 9 = 26.", "Jawaban: B (26)."]
     },
     {
       "packageId": "paket-contoh",

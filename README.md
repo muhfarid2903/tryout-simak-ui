@@ -61,6 +61,7 @@ File import berupa **JSON** berisi satu objek dengan dua array: `packages` dan `
 | `image` | tidak | URL gambar soal (opsional). |
 | `pembahasan` | tidak | Penjelasan jawaban (opsional). |
 | `optExplain` | tidak | Array sejajar dengan `options` — catatan kenapa tiap pilihan salah/benar (umpan balik per-distraktor). Indeks kosong (`""`) = tanpa catatan. |
+| `steps` | tidak | Array string — pembahasan **langkah demi langkah**. Tampil sebagai daftar bernomor yang bisa dilipat di Latihan, Hasil, & Bank Soal; mendukung rumus `$...$`. |
 
 ### Contoh minimal
 ```json
