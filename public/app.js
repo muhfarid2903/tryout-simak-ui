@@ -614,7 +614,8 @@ function fmtDur(ms) {
 
 /* ---------- Statistik & latihan: helpers ---------- */
 // Catat hasil pengerjaan satu soal (dipakai tryout & latihan).
-function recordQStat(qId, outcome, timeMs) {
+// pickedOrig = indeks opsi ASLI yang dipilih (0-based) untuk analitik distraktor; null bila kosong.
+function recordQStat(qId, outcome, timeMs, pickedOrig) {
   if (!qId) return;
   const st = store.qstats[qId] || { seen: 0, correct: 0, wrong: 0, empty: 0, lastResult: null, lastSeen: 0, timeMs: 0 };
   st.seen++;
@@ -622,6 +623,10 @@ function recordQStat(qId, outcome, timeMs) {
   st.lastResult = outcome;
   st.lastSeen = Date.now();
   st.timeMs += timeMs || 0;
+  if (pickedOrig != null && pickedOrig >= 0) { // hitung berapa kali tiap opsi dipilih (analitik distraktor)
+    if (!Array.isArray(st.picks)) st.picks = [];
+    st.picks[pickedOrig] = (st.picks[pickedOrig] || 0) + 1;
+  }
   scheduleSrs(st, outcome);
   store.qstats[qId] = st;
   if (!store.daily) store.daily = {};
@@ -800,6 +805,21 @@ function isLeech(qId) {
 function leechQuestionIds() {
   return store.questions.filter(q => isLeech(q.id)).map(q => q.id)
     .sort((a, b) => srsPriority(b) - srsPriority(a));
+}
+// Interleaving (selang-seling antar mata uji): susun ulang round-robin agar soal dari
+// mata uji yang sama tak menumpuk berurutan — melatih daya bedah & transfer (desirable difficulty).
+// Urutan prioritas DALAM tiap mata uji tetap terjaga.
+function interleaveBySubject(qs) {
+  const groups = new Map();
+  qs.forEach(q => { const s = q.subject || "Lainnya"; if (!groups.has(s)) groups.set(s, []); groups.get(s).push(q); });
+  if (groups.size <= 1) return qs;
+  const buckets = [...groups.values()];
+  const out = [];
+  for (let any = true; any;) {
+    any = false;
+    for (const b of buckets) if (b.length) { out.push(b.shift()); any = true; }
+  }
+  return out;
 }
 // Acuan waktu/soal satu mata uji (median rata-rata waktu per soal yg pernah dikerjakan).
 // Dipakai untuk klasifikasi error per-soal. 0 = data referensi belum cukup.
@@ -1474,6 +1494,37 @@ function questionMateri(q) {
   ]);
 }
 
+// Analitik distraktor: distribusi pilihan jawaban per soal (dari qstats.picks).
+// Bantu deteksi distraktor lemah (tak pernah dipilih) & opsi "menjebak" (lebih laris dari kunci).
+function distractorBlock(q) {
+  const st = store.qstats[q.id];
+  if (!st || !Array.isArray(st.picks)) return null;
+  const n = q.options.length;
+  const picks = []; let total = 0;
+  for (let k = 0; k < n; k++) { const c = st.picks[k] || 0; picks.push(c); total += c; }
+  if (total < 3) return null; // data belum cukup untuk disimpulkan
+  const keyCount = picks[q.answer] || 0;
+  const rows = picks.map((c, k) => {
+    const pct = Math.round((c / total) * 100), isKey = k === q.answer, tone = isKey ? "good" : "bad";
+    const flags = [];
+    if (isAdmin() && !isKey) {
+      if (c === 0 && st.seen >= 8) flags.push("distraktor lemah");
+      else if (c > keyCount) flags.push("menjebak");
+    }
+    return el("div", { class: "mastery-row" }, [
+      el("div", { class: "mr-head" }, [
+        el("strong", {}, `${OPT_KEYS[k]}${isKey ? " ✓ kunci" : ""}`),
+        el("span", { class: "mr-acc " + tone }, `${pct}% (${c})`),
+      ]),
+      el("div", { class: "meter" }, [el("div", { class: "meter-fill " + tone, style: `width:${pct}%` })]),
+      flags.length ? el("div", { class: "mr-meta" }, [el("span", { class: "chip yellow" }, "⚠️ " + flags.join(", "))]) : null,
+    ]);
+  });
+  return el("details", { class: "bank-materi" }, [
+    el("summary", {}, `📊 Distribusi jawaban (${total}×)`),
+    el("div", { class: "bank-materi-body" }, rows),
+  ]);
+}
 function renderBank() {
   const root = app();
   root.innerHTML = "";
@@ -1498,6 +1549,7 @@ function renderBank() {
         el("div", { style: "margin:6px 0;white-space:pre-wrap", html: renderMath(q.text) }),
         el("div", { class: "ans", html: `Kunci: ${answerLetter(q)}. ${renderMath(q.options[q.answer])}` }),
         questionMateri(q),
+        distractorBlock(q),
       ]),
     ])));
     root.appendChild(card);
@@ -1947,7 +1999,7 @@ function finishExam() {
       if (d === null) { empty++; bySubject[subj].empty++; outcome = "empty"; }
       else if (q.order[d] === q.answer) { correct++; bySubject[subj].correct++; outcome = "correct"; }
       else { wrong++; bySubject[subj].wrong++; outcome = "wrong"; }
-      recordQStat(q.id, outcome, t);
+      recordQStat(q.id, outcome, t, d === null ? null : q.order[d]);
     });
   });
   const score = correct * SCORE.correct + wrong * SCORE.wrong;
@@ -2581,7 +2633,8 @@ function startPractice(mode, opts = {}) {
       : "Belum ada soal");
     return;
   }
-  qs = (mode === "subject" || mode === "new") ? shuffle(qs) : qs.slice().sort((a, b) => srsPriority(b.id) - srsPriority(a.id));
+  if (mode === "subject" || mode === "new") qs = shuffle(qs);
+  else qs = interleaveBySubject(qs.slice().sort((a, b) => srsPriority(b.id) - srsPriority(a.id))); // prioritas SRS + selang-seling mata uji
   qs = qs.slice(0, mode === "micro" ? 7 : 25);
   const prepared = qs.map(q => prepareQuestion(q, true));
   practiceState = {
@@ -2698,7 +2751,7 @@ function finalizeAnswer(displayIdx, conf) {
   ps.answers[i] = displayIdx; ps.revealed[i] = true; ps.confidence[i] = conf; ps.times[i] = timeMs;
   const ok = q.order[displayIdx] === q.answer;
   if (ok) ps.correct++; else ps.wrong++;
-  recordQStat(q.id, ok ? "correct" : "wrong", timeMs);
+  recordQStat(q.id, ok ? "correct" : "wrong", timeMs, q.order[displayIdx]);
   if (conf) recordCalibration(conf, ok);
   saveStore();
   renderPracticeSession();
