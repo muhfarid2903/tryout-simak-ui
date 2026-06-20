@@ -523,6 +523,13 @@ table.subj th { background: var(--surface-soft); }
 
 .review-q { margin-bottom: 22px; }
 .pembahasan { background: var(--surface-soft); border-left: 4px solid var(--ui-yellow); padding: 12px 14px; border-radius: 8px; margin-top: 10px; font-size: 14px; white-space: pre-wrap; }
+.steps-block { background: var(--surface-soft); border-left: 4px solid var(--blue); padding: 8px 14px; border-radius: 8px; margin-top: 10px; font-size: 14px; }
+.steps-block summary { cursor: pointer; font-weight: 700; color: var(--ui-ink); list-style: none; user-select: none; }
+.steps-block summary::-webkit-details-marker { display: none; }
+.steps-block summary::after { content: " ▾"; color: var(--ui-ink-soft); }
+.steps-block[open] summary::after { content: " ▴"; }
+.steps-list { margin: 8px 0 4px; padding-left: 22px; }
+.steps-list li { margin: 4px 0; line-height: 1.5; }
 
 /* ---------- Misc ---------- */
 .empty-state { text-align: center; padding: 50px 20px; color: var(--ui-ink-soft); }

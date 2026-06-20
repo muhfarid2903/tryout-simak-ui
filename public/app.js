@@ -492,6 +492,7 @@ function prepareImported(data) {
     if (q.subject == null) q.subject = "";
     if (q.pembahasan == null) q.pembahasan = "";
     if (!Array.isArray(q.optExplain)) q.optExplain = []; // penjelasan per pilihan (kenapa salah)
+    if (!Array.isArray(q.steps)) q.steps = []; // pembahasan langkah-demi-langkah (opsional)
   });
   return normalizeStore(data);
 }
@@ -1209,6 +1210,7 @@ function buildQuestionForm(pkgId, existing) {
   const textInput = el("textarea", { placeholder: "Tulis pertanyaan di sini..." }, data.text || "");
   const imgInput = el("input", { type: "text", placeholder: "URL gambar (opsional)", value: data.image || "" });
   const pembInput = el("textarea", { placeholder: "Pembahasan / penjelasan jawaban (opsional)" }, data.pembahasan || "");
+  const stepsInput = el("textarea", { placeholder: "Satu langkah per baris (opsional)\nmis. Diketahui rata-rata 5 bilangan = 14\nJumlah = 5 × 14 = 70\n…" }, (Array.isArray(data.steps) ? data.steps : []).join("\n"));
 
   const datalist = el("datalist", { id: "subjlist" });
   [...new Set([...PRESET_SUBJECTS, ...store.questions.map(q => q.subject).filter(Boolean)])]
@@ -1226,6 +1228,7 @@ function buildQuestionForm(pkgId, existing) {
       ...optionRows,
     ]),
     field("Pembahasan", pembInput),
+    field("Langkah penyelesaian", stepsInput, "satu langkah per baris — tampil bernomor & bisa dilipat; mendukung rumus $...$"),
     el("div", { class: "btn-row" }, [
       el("button", { class: "btn primary", onclick: () => {
         const opts = optionRows.map(r => r.querySelector(".option-row input").value.trim());
@@ -1234,7 +1237,8 @@ function buildQuestionForm(pkgId, existing) {
         if (!text) { toast("Pertanyaan tidak boleh kosong"); return; }
         if (opts.filter(o => o).length < 2) { toast("Isi minimal 2 pilihan jawaban"); return; }
         if (!opts[correctIdx]) { toast("Pilihan yang ditandai kunci masih kosong"); return; }
-        const payload = { subject: subjectInput.value.trim(), text, image: imgInput.value.trim(), options: opts, answer: correctIdx, pembahasan: pembInput.value.trim(), optExplain };
+        const steps = stepsInput.value.split("\n").map(s => s.trim()).filter(Boolean);
+        const payload = { subject: subjectInput.value.trim(), text, image: imgInput.value.trim(), options: opts, answer: correctIdx, pembahasan: pembInput.value.trim(), optExplain, steps };
         if (isEdit) { Object.assign(existing, payload); toast("Soal diperbarui"); }
         else { store.questions.push({ id: uid(), packageId: pkgId, ...payload }); toast("Soal ditambahkan"); }
         saveStore(); renderInputFor(pkgId);
@@ -1324,6 +1328,7 @@ function questionMateri(q) {
   kids.push(q.pembahasan
     ? el("div", { class: "pembahasan", style: "margin-top:0" }, [el("strong", {}, "Pembahasan: "), el("span", { html: renderMath(q.pembahasan) })])
     : el("div", { class: "note", style: "margin-top:0" }, "Belum ada pembahasan untuk soal ini. Tambahkan lewat menu Input Soal → Edit."));
+  const sbBank = stepsBlock(q); if (sbBank) kids.push(sbBank);
 
   if (m) {
     kids.push(el("div", { class: "materi-ref" }, [
@@ -1566,6 +1571,17 @@ function prepareQuestion(q, shuffleOpts) {
   let order = q.options.map((o, i) => ({ o, i })).filter(x => x.o.trim() !== "").map(x => x.i);
   if (shuffleOpts) order = shuffle(order);
   return { ...q, order };
+}
+// Pembahasan langkah-demi-langkah (opsional): daftar bernomor yang bisa dilipat.
+function stepsBlock(q, open) {
+  const steps = Array.isArray(q.steps) ? q.steps.filter(s => String(s || "").trim()) : [];
+  if (!steps.length) return null;
+  const det = el("details", Object.assign({ class: "steps-block" }, open ? { open: "" } : {}));
+  det.appendChild(el("summary", {}, `🪜 Langkah penyelesaian (${steps.length})`));
+  const ol = el("ol", { class: "steps-list" });
+  steps.forEach(s => ol.appendChild(el("li", { html: renderMath(s) })));
+  det.appendChild(ol);
+  return det;
 }
 // Umpan balik per-distraktor: penjelasan kenapa sebuah pilihan benar/salah (jika ada).
 function optNoteEl(q, origIdx, isCorrect) {
@@ -1979,6 +1995,7 @@ function renderResult(r) {
         const note = optNoteEl(q, origIdx, isCorrect); if (note) card.appendChild(note);
       });
       if (q.pembahasan) card.appendChild(el("div", { class: "pembahasan" }, [el("strong", {}, "Pembahasan: "), el("span", { html: renderMath(q.pembahasan) })]));
+      const sbRes = stepsBlock(q); if (sbRes) card.appendChild(sbRes);
       root.appendChild(card);
     });
   });
@@ -2397,6 +2414,7 @@ function renderPracticeSession() {
        ps.confidence[i] === "guess" && ok ? " Tebakan tepat — perkuat dasarnya agar lain kali yakin." : "")));
   }
   if (revealed && q.pembahasan) card.appendChild(el("div", { class: "pembahasan" }, [el("strong", {}, "Pembahasan: "), el("span", { html: renderMath(q.pembahasan) })]));
+  if (revealed) { const sbPr = stepsBlock(q, true); if (sbPr) card.appendChild(sbPr); }
 
   const lastQ = i === ps.pool.length - 1;
   if (revealed) {
