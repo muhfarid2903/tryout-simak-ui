@@ -897,7 +897,7 @@ let practiceState = null;
 let _activeQ = null, _tickStart = 0; // pelacakan waktu per soal saat ujian
 
 const NAV_VIEWS = ["home", "practice", "stats", "input", "bank", "materi", "achievements", "adminresults", "adminusers", "account"];
-const ADMIN_VIEWS = ["input", "adminusers", "adminresults"];
+const ADMIN_VIEWS = ["input", "bank", "adminusers", "adminresults"];
 let currentView = "home";
 function setNav(view) {
   document.querySelectorAll(".navbtn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
@@ -1460,7 +1460,7 @@ function materiContent(subject, count) {
   if (!m) {
     wrap.appendChild(el("p", { class: "materi-intro" },
       "Belum ada materi bawaan untuk jenis soal ini. Pelajari pola soalnya langsung di Bank Soal beserta kunci & pembahasan."));
-    if (count != null && count > 0)
+    if (count != null && count > 0 && isAdmin())
       wrap.appendChild(el("button", { class: "btn sm", style: "margin-top:8px", onclick: () => go("bank") }, "Lihat soal di Bank Soal →"));
     return wrap;
   }
@@ -1482,7 +1482,7 @@ function materiContent(subject, count) {
     if (t.example) body.appendChild(el("div", { class: "materi-example" }, [el("strong", {}, "Contoh soal: "), t.example]));
   })));
 
-  if (count != null && count > 0) {
+  if (count != null && count > 0 && isAdmin()) {
     wrap.appendChild(el("div", { class: "btn-row", style: "margin-top:16px" }, [
       el("button", { class: "btn sm", onclick: () => go("bank") }, "Lihat soal di Bank Soal →"),
     ]));
@@ -1542,12 +1542,18 @@ function fmtDate(ts) {
   catch (e) { return ""; }
 }
 
+let statsTab = "stats"; // tab aktif di halaman Statistik: "stats" | "achievements"
+// Re-render Pencapaian di konteks yang tepat (tab Statistik atau halaman tersendiri).
+function rerenderAchievements() { if (statsTab === "achievements") renderStats(); else renderAchievements(); }
 function renderAchievements() {
   const root = app();
   root.innerHTML = "";
   root.appendChild(el("h2", { class: "page-title" }, "Pencapaian"));
   root.appendChild(el("p", { class: "page-sub" }, "Kumpulkan badge dan kejar rekor skor tertinggimu di tiap paket."));
-
+  achievementsBody(root);
+}
+// Isi Pencapaian (badge + rekor) — bisa ditanam di tab Statistik atau halaman sendiri.
+function achievementsBody(root) {
   const unlocked = ACHIEVEMENTS.filter(a => store.achievements[a.id]).length;
   const totalAttempts = Object.values(store.records).reduce((a, x) => a + (x.attempts || 0), 0);
 
@@ -1597,7 +1603,7 @@ function renderAchievements() {
           onclick: () => confirmModal("Hapus rekor paket ini?",
             `Rekor & riwayat untuk "${p.name}" akan dihapus. Badge tidak terpengaruh.`, () => {
               delete store.records[p.id];
-              saveStore(); toast("Rekor paket dihapus"); renderAchievements();
+              saveStore(); toast("Rekor paket dihapus"); rerenderAchievements();
             }, "Ya, hapus") }, "Hapus")),
       ]));
     });
@@ -1608,7 +1614,7 @@ function renderAchievements() {
       el("button", { class: "btn sm danger", onclick: () => confirmModal("Reset rekor & pencapaian?",
         "Semua rekor skor, riwayat, dan badge yang terbuka akan dihapus permanen. Soal & paket tidak terpengaruh.", () => {
           store.records = {}; store.achievements = {};
-          saveStore(); toast("Rekor & pencapaian direset"); renderAchievements();
+          saveStore(); toast("Rekor & pencapaian direset"); rerenderAchievements();
         }, "Ya, reset") }, "Reset rekor & pencapaian"),
     ]));
   }
@@ -2137,6 +2143,13 @@ function renderStats() {
   root.innerHTML = "";
   root.appendChild(el("h2", { class: "page-title" }, "Statistik Belajar"));
   root.appendChild(el("p", { class: "page-sub" }, "Lacak perkembanganmu, temukan mata uji yang lemah, lalu latih dengan tepat."));
+
+  // Tab: Statistik | Pencapaian (Pencapaian dilebur ke sini agar sidebar lebih ramping).
+  root.appendChild(el("div", { class: "materi-tabs" }, [
+    el("button", { class: "materi-tab" + (statsTab === "stats" ? " active" : ""), onclick: () => { statsTab = "stats"; renderStats(); window.scrollTo(0, 0); } }, [el("span", { class: "mt-ic" }, "📊"), el("span", {}, "Statistik")]),
+    el("button", { class: "materi-tab" + (statsTab === "achievements" ? " active" : ""), onclick: () => { statsTab = "achievements"; renderStats(); window.scrollTo(0, 0); } }, [el("span", { class: "mt-ic" }, "🏆"), el("span", {}, "Pencapaian")]),
+  ]));
+  if (statsTab === "achievements") { achievementsBody(root); return; }
 
   const totalAttempts = Object.values(store.records).reduce((a, r) => a + (r.attempts || 0), 0);
   const qstatVals = Object.values(store.qstats);

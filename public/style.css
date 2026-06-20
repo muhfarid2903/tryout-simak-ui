@@ -170,6 +170,12 @@ body {
 }
 .navbtn.active .nav-ico { opacity: 1; }
 
+/* Label seksi pengelompokan (hanya admin; user biasa hanya punya grup Belajar). */
+.nav-section { display: none; padding: 12px 12px 4px; font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: #64748b; }
+body.is-admin .nav-section { display: block; }
+/* Saat sidebar terlipat: label berubah jadi garis pemisah tipis. */
+.sidebar-collapsed .nav-section { height: 0; padding: 0; margin: 8px 12px; overflow: hidden; color: transparent; border-top: 1px solid rgba(255,255,255,.12); }
+
 /* ---------- Kaki sidebar (tombol tema) ---------- */
 .sidebar-foot {
   display: flex;
@@ -669,10 +675,14 @@ table.subj th { background: var(--surface-soft); }
 }
 
 /* ---------- Peran & gating navigasi ---------- */
-.navbtn[data-view="input"], .navbtn[data-view="adminusers"], .navbtn[data-view="adminresults"] { display: none; }
+/* Menu khusus admin (termasuk Bank Soal: berisi kunci jawaban — disembunyikan dari user). */
+.navbtn[data-view="input"], .navbtn[data-view="bank"], .navbtn[data-view="adminusers"], .navbtn[data-view="adminresults"] { display: none; }
 body.is-admin .navbtn[data-view="input"],
+body.is-admin .navbtn[data-view="bank"],
 body.is-admin .navbtn[data-view="adminusers"],
 body.is-admin .navbtn[data-view="adminresults"] { display: flex; }
+/* Pencapaian dilebur jadi tab di dalam Statistik — tombol sidebar disembunyikan. */
+.navbtn[data-view="achievements"] { display: none; }
 body:not(.logged-in) .mainnav .navbtn:not([data-view="account"]) { display: none; }
 
 .role-badge { font-size: 11px; font-weight: 800; letter-spacing: .5px; padding: 2px 8px; border-radius: 6px; }
