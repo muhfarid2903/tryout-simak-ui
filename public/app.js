@@ -452,8 +452,10 @@ function normalizeStore(s) {
   s.qstats = s.qstats || {};         // statistik per soal: { seen, correct, wrong, empty, lastResult, lastSeen, timeMs }
   s.bookmarks = s.bookmarks || {};   // soal ditandai: { qId: timestamp }
   s.practiceLog = s.practiceLog || []; // timestamp tiap sesi latihan (untuk streak)
+  s.daily = s.daily || {};            // jumlah soal dijawab per hari: { "YYYY-M-D": n } (untuk target harian)
   s.settings = s.settings || {};
   if (s.settings.calibrate == null) s.settings.calibrate = true; // mode rating keyakinan
+  if (s.settings.dailyGoal == null) s.settings.dailyGoal = 20;   // target soal per hari
   s.calib = s.calib || { sure: { n: 0, correct: 0 }, unsure: { n: 0, correct: 0 }, guess: { n: 0, correct: 0 } };
   if (s._updatedAt == null) s._updatedAt = 0; // penanda versi untuk sinkron antar perangkat
   s.packages.forEach(p => {
@@ -617,6 +619,9 @@ function recordQStat(qId, outcome, timeMs) {
   st.timeMs += timeMs || 0;
   scheduleSrs(st, outcome);
   store.qstats[qId] = st;
+  if (!store.daily) store.daily = {};
+  const dk = dayKey(Date.now());
+  store.daily[dk] = (store.daily[dk] || 0) + 1; // untuk progres target harian
 }
 
 // Kalibrasi keyakinan (metakognisi): cocokkan rasa yakin dengan kebenaran jawaban.
@@ -735,6 +740,14 @@ function subjectMastery() {
     accuracy: a.answered > 0 ? Math.round((a.correct / a.answered) * 100) : null,
     avgMs: a.attempts > 0 ? a.timeMs / a.attempts : 0,
   }));
+}
+// Mata uji terlemah (akurasi terendah, sudah pernah dikerjakan) untuk weakness drill.
+function weakestSubjects(limit = 3) {
+  return subjectMastery()
+    .filter(m => m.attempts > 0 && m.accuracy != null)
+    .sort((a, b) => a.accuracy - b.accuracy)
+    .slice(0, limit)
+    .map(m => m.subject);
 }
 // Skor prioritas SRS: makin tinggi = makin perlu dilatih.
 function srsPriority(qId) {
@@ -937,6 +950,43 @@ function totalMinutes(p) {
   return p.durationMin;
 }
 
+// Jumlah soal yang dijawab hari ini (latihan + ujian) untuk target harian.
+function todayCount() { return (store.daily && store.daily[dayKey(Date.now())]) || 0; }
+function dailyGoalValue() { return Math.max(1, store.settings.dailyGoal || 20); }
+// Kartu target harian dengan cincin progres (SVG, tanpa CSS tambahan).
+function dailyGoalCard() {
+  const goal = dailyGoalValue(), done = todayCount();
+  const met = done >= goal;
+  const R = 30, C = 2 * Math.PI * R, off = C * (1 - Math.min(1, done / goal));
+  const color = met ? "var(--green)" : "var(--ui-yellow-dark)";
+  const ring = el("div", { style: "flex:none", html:
+    `<svg width="76" height="76" viewBox="0 0 76 76" role="img" aria-label="Progres target harian ${done} dari ${goal}">
+       <circle cx="38" cy="38" r="${R}" fill="none" stroke="var(--surface-mute)" stroke-width="8"/>
+       <circle cx="38" cy="38" r="${R}" fill="none" stroke="${color}" stroke-width="8" stroke-linecap="round"
+         stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 38 38)"
+         style="transition:stroke-dashoffset .4s ease"/>
+       <text x="38" y="37" text-anchor="middle" font-size="19" font-weight="800" fill="var(--ui-ink)">${done}</text>
+       <text x="38" y="52" text-anchor="middle" font-size="11" fill="var(--ui-ink-soft)">/${goal}</text>
+     </svg>` });
+  const editGoal = () => {
+    const v = prompt("Target soal per hari:", String(goal));
+    if (v == null) return;
+    const n = parseInt(v, 10);
+    if (!Number.isFinite(n) || n < 1) { toast("Masukkan angka minimal 1"); return; }
+    store.settings.dailyGoal = n; saveStore(); renderHome();
+  };
+  const msg = met
+    ? `🎉 Target hari ini tercapai! ${done} soal — jaga streak-mu besok.`
+    : `Tinggal ${goal - done} soal lagi untuk capai target hari ini. Sedikit demi sedikit, konsisten menang.`;
+  return el("div", { class: "focus-banner", style: "margin-bottom:14px" }, [
+    ring,
+    el("div", { style: "flex:1" }, [
+      el("strong", {}, "Target Belajar Harian"),
+      el("div", { style: "font-size:13px" }, msg),
+    ]),
+    el("button", { class: "btn sm", onclick: editGoal }, "Atur target"),
+  ]);
+}
 function renderHome() {
   const root = app();
   root.innerHTML = "";
@@ -950,6 +1000,9 @@ function renderHome() {
       : emptyState("📦", "Belum ada paket tryout", "Admin belum mengunggah paket soal. Cek lagi nanti ya."));
     return;
   }
+
+  // Target belajar harian (cincin progres).
+  root.appendChild(dailyGoalCard());
 
   // Banner spaced repetition: soal yang jatuh tempo diulang hari ini.
   const dueIds = dueQuestionIds(), newIds = newQuestionIds();
@@ -2070,6 +2123,38 @@ function renderStats() {
     root.appendChild(card);
   }
 
+  // ----- Kecepatan vs Akurasi (manajemen waktu) -----
+  const sa = subjectMastery().filter(m => m.answered > 0 && m.avgMs > 0);
+  if (sa.length >= 2) {
+    const times = sa.map(m => m.avgMs).slice().sort((a, b) => a - b);
+    const medMs = times[Math.floor(times.length / 2)];
+    const ACC = 70;
+    const quad = m => {
+      const fast = m.avgMs <= medMs, acc = m.accuracy != null && m.accuracy >= ACC;
+      if (acc && fast) return { label: "Dikuasai & cepat", icon: "✅", tone: "good", tip: "Pertahankan — ini kekuatanmu." };
+      if (acc && !fast) return { label: "Teliti tapi lambat", icon: "⏳", tone: "mid", tip: "Latih kecepatan: batasi waktu per soal saat drill." };
+      if (!acc && fast) return { label: "Cepat tapi ceroboh", icon: "⚡", tone: "bad", tip: "Pelan sedikit & baca soal sampai tuntas sebelum menjawab." };
+      return { label: "Perlu perkuat konsep", icon: "📖", tone: "bad", tip: "Buka Materi mata uji ini, lalu latih ulang." };
+    };
+    const card = el("div", { class: "card", style: "margin-bottom:18px" }, [
+      el("h3", { style: "margin-top:0" }, "Kecepatan vs Akurasi"),
+      el("p", { class: "q-meta", style: "margin-top:0" }, "Banyak peserta gagal karena manajemen waktu, bukan karena tak bisa. Bandingkan ketepatan dengan kecepatanmu per mata uji."),
+    ]);
+    sa.slice().sort((a, b) => (a.accuracy ?? 999) - (b.accuracy ?? 999)).forEach(m => {
+      const Q = quad(m);
+      card.appendChild(el("div", { class: "mastery-row" }, [
+        el("div", { class: "mr-head" }, [
+          el("strong", {}, m.subject),
+          el("span", { class: "mr-acc " + Q.tone }, `${Q.icon} ${Q.label}`),
+        ]),
+        el("div", { class: "mr-meta" }, [
+          el("span", {}, `🎯 ${m.accuracy}% · ⏱ ${fmtDur(m.avgMs)}/soal — ${Q.tip}`),
+        ]),
+      ]));
+    });
+    root.appendChild(card);
+  }
+
   // ----- Tren skor per paket -----
   store.packages.forEach(p => {
     const rec = store.records[p.id];
@@ -2128,6 +2213,18 @@ function renderPractice() {
     cb, el("span", {}, "🧭 Mode kalibrasi — nilai keyakinanmu (Yakin/Ragu/Tebak) tiap soal untuk melatih kesadaran diri"),
   ]));
 
+  const weakSubs = weakestSubjects(3);
+  if (weakSubs.length) {
+    root.appendChild(el("div", { class: "focus-banner", style: "margin-bottom:16px" }, [
+      el("span", { class: "rb-icon" }, "🩹"),
+      el("div", { style: "flex:1" }, [
+        el("strong", {}, "Latih kelemahanku"),
+        el("div", { style: "font-size:13px" }, `Soal prioritas dari ${weakSubs.length} mata uji terlemahmu (${weakSubs.join(", ")}), diselang-seling untuk retensi terbaik.`),
+      ]),
+      el("button", { class: "btn sm primary", onclick: () => startPractice("weakness", { title: "Latih kelemahanku" }) }, "Mulai"),
+    ]));
+  }
+
   const wrongN = weakQuestionIds().length;
   const bmN = Object.keys(store.bookmarks).length;
   const dueN = dueQuestionIds().length;
@@ -2158,6 +2255,7 @@ function startPractice(mode, opts = {}) {
   else if (mode === "due") ids = dueQuestionIds();
   else if (mode === "new") ids = newQuestionIds();
   else if (mode === "subject") ids = store.questions.filter(q => (q.subject || "Lainnya") === opts.subject).map(q => q.id);
+  else if (mode === "weakness") { const subs = new Set(weakestSubjects(3)); ids = store.questions.filter(q => subs.has(q.subject || "Lainnya")).map(q => q.id); }
   else ids = store.questions.map(q => q.id);
 
   let qs = ids.map(id => byId[id]).filter(Boolean);
@@ -2166,6 +2264,7 @@ function startPractice(mode, opts = {}) {
       : mode === "bookmark" ? "Belum ada soal yang ditandai"
       : mode === "due" ? "Tidak ada soal jatuh tempo hari ini 🎉"
       : mode === "new" ? "Semua soal sudah pernah kamu coba 👍"
+      : mode === "weakness" ? "Kerjakan beberapa soal dulu — kelemahanmu akan terdeteksi otomatis 👍"
       : "Belum ada soal");
     return;
   }
@@ -2449,7 +2548,7 @@ function progressData() {
   return {
     records: store.records || {}, achievements: store.achievements || {},
     qstats: store.qstats || {}, bookmarks: store.bookmarks || {}, practiceLog: store.practiceLog || [],
-    calib: store.calib || {}, settings: store.settings || {},
+    calib: store.calib || {}, settings: store.settings || {}, daily: store.daily || {},
   };
 }
 function applyContent(data) {
@@ -2464,6 +2563,7 @@ function applyProgress(data, updatedAt) {
   store.qstats = data.qstats || {};
   store.bookmarks = data.bookmarks || {};
   store.practiceLog = data.practiceLog || [];
+  store.daily = data.daily || {};
   if (data.calib) store.calib = data.calib;
   if (data.settings) store.settings = data.settings;
   store._updatedAt = updatedAt || 0;
