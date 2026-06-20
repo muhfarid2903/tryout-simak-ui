@@ -2021,6 +2021,49 @@ function countChart(counts, labels) {
   });
   return wrap;
 }
+// Semua riwayat ujian (lintas paket), terurut waktu — untuk prediksi skor.
+function examHistoryAll() {
+  const all = [];
+  Object.values(store.records).forEach(rec => (rec.history || []).forEach(h => all.push(h)));
+  return all.sort((a, b) => a.date - b.date);
+}
+// Prediksi persentase skor ujian berikutnya dari riwayat (rata-rata berbobot terbaru + tren).
+// pct di riwayat sudah memperhitungkan penalti tebakan (benar +4, salah -1) → mirip metrik SIMAK.
+function predictScore() {
+  const hist = examHistoryAll();
+  if (hist.length < 1) return null;
+  const recent = hist.slice(-6);
+  let wsum = 0, vsum = 0;
+  recent.forEach((h, i) => { const w = Math.pow(1.5, i); wsum += w; vsum += w * h.pct; }); // terbaru paling berat
+  let pred = vsum / wsum;
+  if (hist.length >= 4) { // koreksi tren: 3 terbaru vs 3 sebelumnya (dibatasi ±5)
+    const last3 = hist.slice(-3).reduce((a, h) => a + h.pct, 0) / 3;
+    const prev = hist.slice(Math.max(0, hist.length - 6), hist.length - 3);
+    if (prev.length) { const pAvg = prev.reduce((a, h) => a + h.pct, 0) / prev.length; pred += Math.max(-5, Math.min(5, (last3 - pAvg) * 0.5)); }
+  }
+  pred = Math.max(0, Math.min(100, Math.round(pred)));
+  const mean = recent.reduce((a, h) => a + h.pct, 0) / recent.length;
+  const sd = Math.sqrt(recent.reduce((a, h) => a + (h.pct - mean) ** 2, 0) / recent.length);
+  const margin = Math.round(Math.max(4, sd) + (recent.length < 3 ? 6 : recent.length < 5 ? 3 : 0));
+  return { pred, lo: Math.max(0, pred - margin), hi: Math.min(100, pred + margin), n: hist.length, margin };
+}
+function readinessBand(pct) {
+  if (pct >= 75) return { label: "Siap tempur", icon: "🚀", tone: "good" };
+  if (pct >= 60) return { label: "Hampir siap", icon: "💪", tone: "good" };
+  if (pct >= 45) return { label: "Berkembang", icon: "📈", tone: "mid" };
+  return { label: "Tahap awal", icon: "🌱", tone: "bad" };
+}
+// Rekomendasi fokus: mata uji terlemah + estimasi kenaikan skor bila diangkat ke 80%.
+function focusRecommendation() {
+  const m = subjectMastery().filter(x => x.answered >= 3 && x.accuracy != null);
+  if (!m.length) return null;
+  const totalQ = m.reduce((a, x) => a + (x.qCount || x.answered), 0) || 1;
+  const weakest = m.slice().sort((a, b) => a.accuracy - b.accuracy)[0];
+  if (weakest.accuracy >= 80) return null;
+  const share = (weakest.qCount || weakest.answered) / totalQ;
+  const gain = Math.round(share * (80 - weakest.accuracy)); // perkiraan poin % naik
+  return { subject: weakest.subject, accuracy: weakest.accuracy, gain };
+}
 function renderStats() {
   const root = app();
   root.innerHTML = "";
@@ -2049,6 +2092,33 @@ function renderStats() {
     statCard("🎯", overallAcc == null ? "–" : overallAcc + "%", "akurasi keseluruhan"),
     statCard("📚", sumSeen, "soal dikerjakan"),
   ]));
+
+  // ----- Prediksi skor & rekomendasi fokus -----
+  const pred = predictScore();
+  if (pred) {
+    const band = readinessBand(pred.pred), foc = focusRecommendation();
+    const card = el("div", { class: "card", style: "margin-bottom:18px" }, [
+      el("h3", { style: "margin-top:0" }, "Prediksi Skor Ujian"),
+      el("div", { style: "display:flex;align-items:baseline;gap:10px;flex-wrap:wrap" }, [
+        el("span", { class: "mr-acc " + band.tone, style: "font-size:34px" }, pred.pred + "%"),
+        el("span", { class: "q-meta" }, `kisaran ${pred.lo}–${pred.hi}%`),
+        el("span", { class: "chip " + (band.tone === "good" ? "" : "yellow"), style: "margin-left:auto" }, `${band.icon} ${band.label}`),
+      ]),
+      el("div", { class: "meter", style: "margin:10px 0" }, [el("div", { class: "meter-fill " + band.tone, style: `width:${pred.pred}%` })]),
+      el("p", { class: "q-meta", style: "margin:0" }, `Estimasi dari ${pred.n} ujian terakhir (terbaru paling berpengaruh). Skor sudah memperhitungkan penalti tebakan — ini estimasi internal, bukan skor resmi SIMAK.`),
+    ]);
+    if (foc && foc.gain >= 1) {
+      card.appendChild(el("div", { class: "focus-banner", style: "margin:12px 0 0" }, [
+        el("span", { class: "rb-icon" }, "🎯"),
+        el("div", { style: "flex:1" }, [
+          el("strong", {}, `Ungkit terbesar: ${foc.subject}`),
+          el("div", { style: "font-size:13px" }, `Akurasi ${foc.accuracy}%. Naikkan ke 80% → perkiraan skormu bisa +${foc.gain} poin %. Fokus di sini paling efisien.`),
+        ]),
+        el("button", { class: "btn sm primary", onclick: () => startPractice("subject", { subject: foc.subject, title: "Latihan " + foc.subject }) }, "Latih"),
+      ]));
+    }
+    root.appendChild(card);
+  }
 
   // ----- Jadwal review (spaced repetition) -----
   if (sumSeen > 0) {
