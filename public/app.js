@@ -453,9 +453,13 @@ function normalizeStore(s) {
   s.bookmarks = s.bookmarks || {};   // soal ditandai: { qId: timestamp }
   s.practiceLog = s.practiceLog || []; // timestamp tiap sesi latihan (untuk streak)
   s.daily = s.daily || {};            // jumlah soal dijawab per hari: { "YYYY-M-D": n } (untuk target harian)
+  s.dailyMs = s.dailyMs || {};        // total waktu belajar per hari (ms): untuk target harian berbasis menit
+  s.qnotes = s.qnotes || {};          // catatan refleksi per soal (jurnal kesalahan): { qId: teks }
   s.settings = s.settings || {};
   if (s.settings.calibrate == null) s.settings.calibrate = true; // mode rating keyakinan
   if (s.settings.dailyGoal == null) s.settings.dailyGoal = 20;   // target soal per hari
+  if (s.settings.dailyGoalType == null) s.settings.dailyGoalType = "count"; // "count" (soal) | "minutes" (menit)
+  if (s.settings.dailyGoalMin == null) s.settings.dailyGoalMin = 15;        // target menit per hari
   s.calib = s.calib || { sure: { n: 0, correct: 0 }, unsure: { n: 0, correct: 0 }, guess: { n: 0, correct: 0 } };
   if (s._updatedAt == null) s._updatedAt = 0; // penanda versi untuk sinkron antar perangkat
   s.packages.forEach(p => {
@@ -621,8 +625,10 @@ function recordQStat(qId, outcome, timeMs) {
   scheduleSrs(st, outcome);
   store.qstats[qId] = st;
   if (!store.daily) store.daily = {};
+  if (!store.dailyMs) store.dailyMs = {};
   const dk = dayKey(Date.now());
-  store.daily[dk] = (store.daily[dk] || 0) + 1; // untuk progres target harian
+  store.daily[dk] = (store.daily[dk] || 0) + 1;            // progres target harian (jumlah soal)
+  store.dailyMs[dk] = (store.dailyMs[dk] || 0) + (timeMs || 0); // progres target harian (waktu)
 }
 
 // Kalibrasi keyakinan (metakognisi): cocokkan rasa yakin dengan kebenaran jawaban.
@@ -818,6 +824,16 @@ function errorKind(q, timeMs) {
     return { icon: "⚡", label: "Cepat tapi salah — kemungkinan ceroboh", tip: "Baca soal & semua pilihan sampai tuntas sebelum mengunci jawaban." };
   return { icon: "🐢", label: "Lambat & salah — konsepnya belum kuat", tip: "Buka materi mata uji ini, lalu ulangi soal serupa." };
 }
+// Petunjuk kecepatan saat pembahasan: bandingkan waktu jawab dgn kebiasaan di mata uji ini.
+function speedHint(q, timeMs) {
+  const med = subjectTimeRef(q.subject || "Lainnya");
+  if (!med || !timeMs) return null;
+  const ratio = timeMs / med;
+  const word = ratio >= 1.6 ? `lebih lambat dari biasanya (≈${ratio.toFixed(1)}×)`
+    : ratio <= 0.6 ? "lebih cepat dari biasanya"
+    : "sesuai kecepatan biasamu";
+  return `⏱ ${fmtDur(timeMs)} — ${word} di ${q.subject || "Lainnya"} (rata-rata ${fmtDur(med)}/soal).`;
+}
 function isBookmarked(qId) { return !!store.bookmarks[qId]; }
 function toggleBookmark(qId) {
   if (store.bookmarks[qId]) delete store.bookmarks[qId];
@@ -997,6 +1013,10 @@ function totalMinutes(p) {
 // Jumlah soal yang dijawab hari ini (latihan + ujian) untuk target harian.
 function todayCount() { return (store.daily && store.daily[dayKey(Date.now())]) || 0; }
 function dailyGoalValue() { return Math.max(1, store.settings.dailyGoal || 20); }
+// Target harian berbasis waktu (menit) — alternatif ramah bagi pengguna sibuk.
+function dailyGoalType() { return store.settings.dailyGoalType === "minutes" ? "minutes" : "count"; }
+function todayMinutes() { return Math.round((((store.dailyMs && store.dailyMs[dayKey(Date.now())]) || 0)) / 60000); }
+function dailyGoalMinValue() { return Math.max(1, store.settings.dailyGoalMin || 15); }
 
 /* ---------- Pengingat review (notifikasi) ---------- */
 function notifySupported() { return typeof Notification !== "undefined"; }
@@ -1042,13 +1062,17 @@ function maybeRemindReviews() {
 }
 
 // Kartu target harian dengan cincin progres (SVG, tanpa CSS tambahan).
+// Dua mode: berbasis jumlah soal ("count") atau waktu belajar ("minutes").
 function dailyGoalCard() {
-  const goal = dailyGoalValue(), done = todayCount();
+  const byMin = dailyGoalType() === "minutes";
+  const goal = byMin ? dailyGoalMinValue() : dailyGoalValue();
+  const done = byMin ? todayMinutes() : todayCount();
+  const unit = byMin ? "menit" : "soal";
   const met = done >= goal;
   const R = 30, C = 2 * Math.PI * R, off = C * (1 - Math.min(1, done / goal));
   const color = met ? "var(--green)" : "var(--ui-yellow-dark)";
   const ring = el("div", { style: "flex:none", html:
-    `<svg width="76" height="76" viewBox="0 0 76 76" role="img" aria-label="Progres target harian ${done} dari ${goal}">
+    `<svg width="76" height="76" viewBox="0 0 76 76" role="img" aria-label="Progres target harian ${done} dari ${goal} ${unit}">
        <circle cx="38" cy="38" r="${R}" fill="none" stroke="var(--surface-mute)" stroke-width="8"/>
        <circle cx="38" cy="38" r="${R}" fill="none" stroke="${color}" stroke-width="8" stroke-linecap="round"
          stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 38 38)"
@@ -1057,11 +1081,16 @@ function dailyGoalCard() {
        <text x="38" y="52" text-anchor="middle" font-size="11" fill="var(--ui-ink-soft)">/${goal}</text>
      </svg>` });
   const editGoal = () => {
-    const v = prompt("Target soal per hari:", String(goal));
+    const v = prompt(byMin ? "Target menit belajar per hari:" : "Target soal per hari:", String(goal));
     if (v == null) return;
     const n = parseInt(v, 10);
     if (!Number.isFinite(n) || n < 1) { toast("Masukkan angka minimal 1"); return; }
-    store.settings.dailyGoal = n; saveStore(); renderHome();
+    if (byMin) store.settings.dailyGoalMin = n; else store.settings.dailyGoal = n;
+    saveStore(); renderHome();
+  };
+  const toggleType = () => {
+    store.settings.dailyGoalType = byMin ? "count" : "minutes";
+    saveStore(); renderHome();
   };
   const remindBtn = !notifySupported() ? null
     : remindersOn()
@@ -1071,9 +1100,11 @@ function dailyGoalCard() {
     ring,
     el("div", { style: "flex:1" }, [
       el("strong", {}, "Target Belajar Harian"),
+      el("div", { class: "q-meta", style: "font-size:13px" }, byMin ? `⏱ ${done} dari ${goal} menit` : `📝 ${done} dari ${goal} soal`),
     ]),
     el("div", { class: "btn-row", style: "flex-direction:column;gap:6px;flex:none" }, [
       el("button", { class: "btn sm", onclick: editGoal }, "Atur target"),
+      el("button", { class: "btn sm", title: "Ganti satuan target", onclick: toggleType }, byMin ? "📝 Pakai jumlah soal" : "⏱ Pakai menit"),
       remindBtn,
     ]),
   ]);
@@ -2112,6 +2143,51 @@ function statCard(icon, value, label) {
   ]);
 }
 function accTone(acc) { return acc == null ? "mid" : acc >= 75 ? "good" : acc >= 50 ? "mid" : "bad"; }
+// Jurnal Kesalahan (#2): kumpulan soal yang pernah salah / "bandel" untuk dibaca ulang,
+// lengkap kunci + pembahasan + catatan refleksi pribadi (elaborative interrogation).
+function journalBody(root) {
+  const byId = {}; store.questions.forEach(q => byId[q.id] = q);
+  const ids = [...new Set([...weakQuestionIds(), ...leechQuestionIds()])]
+    .filter(id => byId[id])
+    .sort((a, b) => srsPriority(b) - srsPriority(a));
+  if (!ids.length) {
+    root.appendChild(emptyState("📓", "Belum ada catatan kesalahan",
+      "Setiap soal yang kamu jawab salah akan muncul di sini untuk dibaca ulang. Mantap kalau masih kosong! 🎉",
+      el("button", { class: "btn primary", onclick: () => go("practice") }, "Mulai latihan")));
+    return;
+  }
+  root.appendChild(el("div", { class: "focus-banner", style: "margin-bottom:14px" }, [
+    el("span", { class: "rb-icon" }, "📓"),
+    el("div", { style: "flex:1" }, [
+      el("strong", {}, `${ids.length} soal untuk ditinjau`),
+      el("div", { style: "font-size:13px" }, "Baca ulang, tulis kenapa kamu salah, lalu latih lagi. Menjelaskan ke diri sendiri membuat ingatan lebih melekat."),
+    ]),
+    el("button", { class: "btn sm primary", onclick: () => startPractice("wrong", { title: "Soal yang salah" }) }, "Latih semua"),
+  ]));
+  const list = el("div");
+  ids.slice(0, 50).forEach(id => {
+    const q = byId[id], st = store.qstats[id] || {};
+    const card = el("div", { class: "card", style: "margin-bottom:14px" }, [
+      el("div", { class: "q-meta", style: "display:flex;align-items:center;gap:8px;flex-wrap:wrap" }, [
+        q.subject ? el("span", { class: "tag" }, q.subject) : null,
+        isLeech(id) ? el("span", { class: "chip yellow" }, "🧯 Sering salah") : null,
+        el("span", {}, `❌ ${st.wrong || 0}× · ✅ ${st.correct || 0}×`),
+      ]),
+      mathText("div", "q-text", q.text),
+      el("div", { class: "pembahasan" }, [el("strong", {}, "Kunci: "), el("span", { html: renderMath(q.options[q.answer]) })]),
+    ]);
+    if (q.pembahasan) card.appendChild(el("div", { class: "pembahasan" }, [el("strong", {}, "Pembahasan: "), el("span", { html: renderMath(q.pembahasan) })]));
+    const ta = el("textarea", { rows: "2", placeholder: "Catatan: kenapa aku salah? (mis. salah baca soal, lupa rumus…)", style: "margin-top:10px;width:100%" }, store.qnotes[id] || "");
+    ta.addEventListener("change", () => {
+      const v = ta.value.trim();
+      if (v) store.qnotes[id] = v; else delete store.qnotes[id];
+      saveStore(); toast("Catatan disimpan");
+    });
+    card.appendChild(ta);
+    list.appendChild(card);
+  });
+  root.appendChild(list);
+}
 function barChart(pcts, labels) {
   const wrap = el("div", { class: "bar-chart" });
   pcts.forEach((pct, i) => {
@@ -2212,12 +2288,14 @@ function renderStats() {
   root.innerHTML = "";
   root.appendChild(el("h2", { class: "page-title" }, "Statistik Belajar"));
 
-  // Tab: Statistik | Pencapaian (Pencapaian dilebur ke sini agar sidebar lebih ramping).
+  // Tab: Statistik | Jurnal Kesalahan | Pencapaian (dilebur ke sini agar sidebar ramping).
   root.appendChild(el("div", { class: "materi-tabs" }, [
     el("button", { class: "materi-tab" + (statsTab === "stats" ? " active" : ""), onclick: () => { statsTab = "stats"; renderStats(); window.scrollTo(0, 0); } }, [el("span", { class: "mt-ic" }, "📊"), el("span", {}, "Statistik")]),
+    el("button", { class: "materi-tab" + (statsTab === "journal" ? " active" : ""), onclick: () => { statsTab = "journal"; renderStats(); window.scrollTo(0, 0); } }, [el("span", { class: "mt-ic" }, "📓"), el("span", {}, "Jurnal Kesalahan")]),
     el("button", { class: "materi-tab" + (statsTab === "achievements" ? " active" : ""), onclick: () => { statsTab = "achievements"; renderStats(); window.scrollTo(0, 0); } }, [el("span", { class: "mt-ic" }, "🏆"), el("span", {}, "Pencapaian")]),
   ]));
   if (statsTab === "achievements") { achievementsBody(root); return; }
+  if (statsTab === "journal") { journalBody(root); return; }
 
   const totalAttempts = Object.values(store.records).reduce((a, r) => a + (r.attempts || 0), 0);
   const qstatVals = Object.values(store.qstats);
@@ -2570,6 +2648,11 @@ function renderPracticeSession() {
     if (ek) card.appendChild(el("div", { class: "q-meta", style: "margin-top:12px;padding:8px 12px;border-radius:8px;background:var(--surface-soft)" },
       `${ek.icon} ${ek.label}. ${ek.tip}`));
   }
+  // Petunjuk kecepatan untuk soal yang dijawab (benar maupun salah).
+  if (revealed && chosen != null) {
+    const sh = speedHint(q, ps.times[i]);
+    if (sh) card.appendChild(el("div", { class: "q-meta", style: "margin-top:8px" }, sh));
+  }
   if (revealed && q.pembahasan) card.appendChild(el("div", { class: "pembahasan" }, [el("strong", {}, "Pembahasan: "), el("span", { html: renderMath(q.pembahasan) })]));
   if (revealed) { const sbPr = stepsBlock(q, true); if (sbPr) card.appendChild(sbPr); }
 
@@ -2795,6 +2878,7 @@ function progressData() {
     records: store.records || {}, achievements: store.achievements || {},
     qstats: store.qstats || {}, bookmarks: store.bookmarks || {}, practiceLog: store.practiceLog || [],
     calib: store.calib || {}, settings: store.settings || {}, daily: store.daily || {},
+    dailyMs: store.dailyMs || {}, qnotes: store.qnotes || {},
   };
 }
 function applyContent(data) {
@@ -2810,6 +2894,8 @@ function applyProgress(data, updatedAt) {
   store.bookmarks = data.bookmarks || {};
   store.practiceLog = data.practiceLog || [];
   store.daily = data.daily || {};
+  store.dailyMs = data.dailyMs || {};
+  store.qnotes = data.qnotes || {};
   if (data.calib) store.calib = data.calib;
   if (data.settings) store.settings = data.settings;
   store._updatedAt = updatedAt || 0;
