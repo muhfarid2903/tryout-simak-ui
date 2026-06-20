@@ -1020,9 +1020,6 @@ function dailyGoalCard() {
     if (!Number.isFinite(n) || n < 1) { toast("Masukkan angka minimal 1"); return; }
     store.settings.dailyGoal = n; saveStore(); renderHome();
   };
-  const msg = met
-    ? `🎉 Target hari ini tercapai! ${done} soal — jaga streak-mu besok.`
-    : `Tinggal ${goal - done} soal lagi untuk capai target hari ini. Sedikit demi sedikit, konsisten menang.`;
   const remindBtn = !notifySupported() ? null
     : remindersOn()
       ? el("button", { class: "btn sm", title: "Matikan pengingat", onclick: disableReminders }, "🔔 Pengingat aktif")
@@ -1031,7 +1028,6 @@ function dailyGoalCard() {
     ring,
     el("div", { style: "flex:1" }, [
       el("strong", {}, "Target Belajar Harian"),
-      el("div", { style: "font-size:13px" }, msg),
     ]),
     el("div", { class: "btn-row", style: "flex-direction:column;gap:6px;flex:none" }, [
       el("button", { class: "btn sm", onclick: editGoal }, "Atur target"),
@@ -1043,7 +1039,6 @@ function renderHome() {
   const root = app();
   root.innerHTML = "";
   root.appendChild(el("h2", { class: "page-title" }, "Paket Tryout"));
-  root.appendChild(el("p", { class: "page-sub" }, "Pilih paket lalu kerjakan dalam mode ujian. Soal & pilihan diacak tiap kali diulang."));
 
   if (store.packages.length === 0) {
     root.appendChild(isAdmin()
@@ -1063,9 +1058,6 @@ function renderHome() {
       el("span", { class: "rb-icon" }, dueIds.length ? "📅" : "✨"),
       el("div", { style: "flex:1" }, [
         el("strong", {}, dueIds.length ? `Review hari ini: ${dueIds.length} soal` : "Tidak ada review jatuh tempo 🎉"),
-        el("div", { style: "font-size:13px" }, dueIds.length
-          ? `Soal yang sudah waktunya diulang agar tetap melekat di ingatan.${newIds.length ? ` Plus ${newIds.length} soal baru menanti.` : ""}`
-          : (newIds.length ? `Ada ${newIds.length} soal baru yang belum kamu coba.` : "Semua soal terjadwal — mantap!")),
       ]),
       dueIds.length
         ? el("button", { class: "btn sm primary", onclick: () => startPractice("due", { title: "Review hari ini" }) }, "Mulai review")
@@ -1113,7 +1105,6 @@ function renderInput(focusPkgId) {
   const root = app();
   root.innerHTML = "";
   root.appendChild(el("h2", { class: "page-title" }, "Input Soal"));
-  root.appendChild(el("p", { class: "page-sub" }, "Buat paket, atur mode waktu & mata uji, tambahkan soal. Langsung bisa dikerjakan di Beranda."));
 
   const select = el("select", { id: "pkgSelect" });
   store.packages.forEach(p => select.appendChild(el("option", { value: p.id }, `${p.name} (${questionsOf(p.id).length} soal)`)));
@@ -1401,7 +1392,6 @@ function renderBank() {
   const root = app();
   root.innerHTML = "";
   root.appendChild(el("h2", { class: "page-title" }, "Bank Soal"));
-  root.appendChild(el("p", { class: "page-sub" }, "Seluruh soal yang tersimpan, dikelompokkan per paket."));
   if (store.questions.length === 0) {
     root.appendChild(emptyState("🗂", "Bank soal kosong", "Tambahkan soal lewat menu Input Soal.",
       el("button", { class: "btn primary", onclick: () => go("input") }, "Input Soal")));
@@ -1497,7 +1487,6 @@ function renderMateri() {
   root.innerHTML = "";
   document.body.classList.remove("auth-screen");
   root.appendChild(el("h2", { class: "page-title" }, "Materi"));
-  root.appendChild(el("p", { class: "page-sub" }, "Pilih mata uji, lalu klik topik yang ingin kamu pelajari — penjelasan terbuka satu per satu, tanpa scroll panjang."));
 
   const counts = subjectCounts();
   const subjects = Object.keys(counts);
@@ -1549,7 +1538,6 @@ function renderAchievements() {
   const root = app();
   root.innerHTML = "";
   root.appendChild(el("h2", { class: "page-title" }, "Pencapaian"));
-  root.appendChild(el("p", { class: "page-sub" }, "Kumpulkan badge dan kejar rekor skor tertinggimu di tiap paket."));
   achievementsBody(root);
 }
 // Isi Pencapaian (badge + rekor) — bisa ditanam di tab Statistik atau halaman sendiri.
@@ -2142,7 +2130,6 @@ function renderStats() {
   const root = app();
   root.innerHTML = "";
   root.appendChild(el("h2", { class: "page-title" }, "Statistik Belajar"));
-  root.appendChild(el("p", { class: "page-sub" }, "Lacak perkembanganmu, temukan mata uji yang lemah, lalu latih dengan tepat."));
 
   // Tab: Statistik | Pencapaian (Pencapaian dilebur ke sini agar sidebar lebih ramping).
   root.appendChild(el("div", { class: "materi-tabs" }, [
@@ -2193,7 +2180,7 @@ function renderStats() {
         el("span", { class: "rb-icon" }, "🎯"),
         el("div", { style: "flex:1" }, [
           el("strong", {}, `Ungkit terbesar: ${foc.subject}`),
-          el("div", { style: "font-size:13px" }, `Akurasi ${foc.accuracy}%. Naikkan ke 80% → perkiraan skormu bisa +${foc.gain} poin %. Fokus di sini paling efisien.`),
+          el("div", { style: "font-size:13px" }, `Akurasi ${foc.accuracy}% · +${foc.gain} poin`),
         ]),
         el("button", { class: "btn sm primary", onclick: () => startPractice("subject", { subject: foc.subject, title: "Latihan " + foc.subject }) }, "Latih"),
       ]));
@@ -2207,9 +2194,6 @@ function renderStats() {
     const labels = ["Hari ini", "Besok", "+2h", "+3h", "+4h", "+5h", "+6h"];
     const card = el("div", { class: "card", style: "margin-bottom:18px" }, [
       el("h3", { style: "margin-top:0" }, "Jadwal Review (Spaced Repetition)"),
-      el("p", { class: "q-meta", style: "margin-top:0" }, dueNow
-        ? `${dueNow} soal jatuh tempo untuk diulang hari ini. Soal yang dijawab benar muncul lagi makin jarang; yang salah segera diulang.`
-        : "Tidak ada soal jatuh tempo hari ini — semua sudah terjadwal di hari berikutnya. 🎉"),
       countChart(forecast, labels),
     ]);
     if (dueNow) card.appendChild(el("div", { class: "btn-row", style: "margin-top:12px" }, [
@@ -2230,7 +2214,6 @@ function renderStats() {
       insight = `Tebakanmu sering tepat (${guessAcc}%) — intuisimu bagus. Perkuat dasarnya agar berubah jadi "Yakin".`;
     const card = el("div", { class: "card", style: "margin-bottom:18px" }, [
       el("h3", { style: "margin-top:0" }, "Kalibrasi Keyakinan"),
-      el("p", { class: "q-meta", style: "margin-top:0" }, "Seberapa cocok rasa yakinmu dengan kebenaran jawaban — inti dari belajar menyadari apa yang benar-benar kamu kuasai."),
     ]);
     [["sure", "💪 Yakin"], ["unsure", "🤔 Ragu"], ["guess", "🎲 Tebak"]].forEach(([k, lbl]) => {
       const c = cal[k], a = accOf(c), tone = accTone(a);
@@ -2253,7 +2236,7 @@ function renderStats() {
         el("span", { class: "rb-icon" }, "🎯"),
         el("div", { style: "flex:1" }, [
           el("strong", {}, `Fokus latihan: ${weakest.subject}`),
-          el("div", { style: "font-size:13px" }, `Akurasimu ${weakest.accuracy}% di mata uji ini — paling perlu diperkuat.`),
+          el("div", { style: "font-size:13px" }, `Akurasi ${weakest.accuracy}%`),
         ]),
         el("button", { class: "btn sm primary", onclick: () => startPractice("subject", { subject: weakest.subject, title: "Latihan " + weakest.subject }) }, "Latih sekarang"),
       ]));
@@ -2289,7 +2272,6 @@ function renderStats() {
     };
     const card = el("div", { class: "card", style: "margin-bottom:18px" }, [
       el("h3", { style: "margin-top:0" }, "Kecepatan vs Akurasi"),
-      el("p", { class: "q-meta", style: "margin-top:0" }, "Banyak peserta gagal karena manajemen waktu, bukan karena tak bisa. Bandingkan ketepatan dengan kecepatanmu per mata uji."),
     ]);
     sa.slice().sort((a, b) => (a.accuracy ?? 999) - (b.accuracy ?? 999)).forEach(m => {
       const Q = quad(m);
@@ -2299,7 +2281,7 @@ function renderStats() {
           el("span", { class: "mr-acc " + Q.tone }, `${Q.icon} ${Q.label}`),
         ]),
         el("div", { class: "mr-meta" }, [
-          el("span", {}, `🎯 ${m.accuracy}% · ⏱ ${fmtDur(m.avgMs)}/soal — ${Q.tip}`),
+          el("span", {}, `🎯 ${m.accuracy}% · ⏱ ${fmtDur(m.avgMs)}/soal`),
         ]),
       ]));
     });
@@ -2349,7 +2331,6 @@ function renderPractice() {
   const root = app();
   root.innerHTML = "";
   root.appendChild(el("h2", { class: "page-title" }, "Latihan Soal"));
-  root.appendChild(el("p", { class: "page-sub" }, "Latihan tanpa batas waktu dengan umpan balik & pembahasan langsung. Soal dipilih cerdas (spaced repetition) — yang sering salah & belum dikuasai didahulukan."));
 
   if (!store.questions.length) {
     root.appendChild(emptyState("📚", "Belum ada soal", "Tambahkan soal di menu Input Soal dulu.",
@@ -2361,7 +2342,7 @@ function renderPractice() {
   cb.checked = store.settings.calibrate !== false;
   cb.addEventListener("change", () => { store.settings.calibrate = cb.checked; saveStore(); });
   root.appendChild(el("label", { style: "display:flex;align-items:center;gap:8px;cursor:pointer;margin:-4px 0 14px;font-size:14px" }, [
-    cb, el("span", {}, "🧭 Mode kalibrasi — nilai keyakinanmu (Yakin/Ragu/Tebak) tiap soal untuk melatih kesadaran diri"),
+    cb, el("span", {}, "🧭 Mode kalibrasi keyakinan (Yakin/Ragu/Tebak)"),
   ]));
 
   const weakSubs = weakestSubjects(3);
@@ -2370,7 +2351,7 @@ function renderPractice() {
       el("span", { class: "rb-icon" }, "🩹"),
       el("div", { style: "flex:1" }, [
         el("strong", {}, "Latih kelemahanku"),
-        el("div", { style: "font-size:13px" }, `Soal prioritas dari ${weakSubs.length} mata uji terlemahmu (${weakSubs.join(", ")}), diselang-seling untuk retensi terbaik.`),
+        el("div", { style: "font-size:13px" }, weakSubs.join(", ")),
       ]),
       el("button", { class: "btn sm primary", onclick: () => startPractice("weakness", { title: "Latih kelemahanku" }) }, "Mulai"),
     ]));
@@ -2780,9 +2761,6 @@ function renderAccount() {
   if (isLoggedIn()) {
     document.body.classList.remove("auth-screen");
     root.appendChild(el("h2", { class: "page-title" }, "Akun"));
-    root.appendChild(el("p", { class: "page-sub" }, isAdmin()
-      ? "Kamu masuk sebagai admin — kamu mengelola paket & soal untuk semua pengguna."
-      : "Progres belajarmu otomatis tersimpan & sinkron di semua perangkat."));
     const panel = el("div", { class: "card", style: "max-width:520px" }, [
       el("div", { class: "q-meta" }, "Masuk sebagai"),
       el("div", { style: "display:flex;align-items:center;gap:10px;margin:2px 0 12px" }, [
@@ -2877,7 +2855,6 @@ async function renderAdminUsers() {
   root.innerHTML = "";
   root.appendChild(el("h2", { class: "page-title" }, "Kelola User"));
   if (!isAdmin()) { root.appendChild(emptyState("🔒", "Khusus admin", "Halaman ini hanya untuk admin.")); return; }
-  root.appendChild(el("p", { class: "page-sub" }, "Daftar pengguna terdaftar. Kamu bisa menghapus user biasa (beserta progresnya)."));
   const card = el("div", { class: "card", style: "padding:0;overflow:hidden" }, [el("div", { class: "q-meta", style: "padding:16px" }, "Memuat…")]);
   root.appendChild(card);
   try {
@@ -2916,7 +2893,6 @@ async function renderAdminResults() {
   document.body.classList.remove("auth-screen");
   root.appendChild(el("h2", { class: "page-title" }, "Hasil Ujian"));
   if (!isAdmin()) { root.appendChild(emptyState("🔒", "Khusus admin", "Halaman ini hanya untuk admin.")); return; }
-  root.appendChild(el("p", { class: "page-sub" }, "Rekap hasil tryout seluruh pengguna — rekor, jumlah percobaan, dan skor terakhir tiap paket."));
 
   const status = el("div", { class: "q-meta" }, "Memuat…");
   root.appendChild(status);
