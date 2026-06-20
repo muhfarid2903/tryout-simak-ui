@@ -4,6 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tryout SIMAK UI Pascasarjana</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#f5c518" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#1d1d1f" media="(prefers-color-scheme: dark)" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Tryout SIMAK" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
   <script>
     // Terapkan tema sedini mungkin agar tidak ada kedip (flash) saat memuat.
     try {
@@ -73,5 +81,13 @@
 
   <!-- Templates rendered via JS into #app -->
   <script src="app.js"></script>
+  <script>
+    // Daftarkan service worker (PWA: bisa diinstal & dibuka offline).
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("service-worker.js").catch(function () {});
+      });
+    }
+  </script>
 </body>
 </html>

@@ -1,0 +1,17 @@
+{
+  "name": "Tryout SIMAK UI Pascasarjana",
+  "short_name": "Tryout SIMAK",
+  "description": "Latihan soal TPA & Bahasa Inggris untuk persiapan SIMAK UI Pascasarjana — latihan adaptif, spaced repetition, & analitik belajar.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fbfbfd",
+  "theme_color": "#f5c518",
+  "lang": "id",
+  "categories": ["education"],
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

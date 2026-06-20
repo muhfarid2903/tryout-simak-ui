@@ -954,6 +954,50 @@ function totalMinutes(p) {
 // Jumlah soal yang dijawab hari ini (latihan + ujian) untuk target harian.
 function todayCount() { return (store.daily && store.daily[dayKey(Date.now())]) || 0; }
 function dailyGoalValue() { return Math.max(1, store.settings.dailyGoal || 20); }
+
+/* ---------- Pengingat review (notifikasi) ---------- */
+function notifySupported() { return typeof Notification !== "undefined"; }
+function notifyGranted() { return notifySupported() && Notification.permission === "granted"; }
+function remindersOn() { return store.settings.remind === true && notifyGranted(); }
+async function enableReminders() {
+  if (!notifySupported()) { toast("Browser ini tidak mendukung notifikasi"); return; }
+  let perm = Notification.permission;
+  if (perm !== "granted") { try { perm = await Notification.requestPermission(); } catch (e) { perm = "denied"; } }
+  if (perm !== "granted") { toast("Izin notifikasi ditolak — aktifkan lewat pengaturan browser"); return; }
+  store.settings.remind = true; saveStore();
+  // Best-effort: pengingat harian via periodic background sync (Chromium + PWA terpasang).
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    if (reg && reg.periodicSync) {
+      const status = await navigator.permissions.query({ name: "periodic-background-sync" });
+      if (status.state === "granted") await reg.periodicSync.register("review-reminder", { minInterval: 24 * 60 * 60 * 1000 });
+    }
+  } catch (e) { /* abaikan — pengingat tetap muncul saat aplikasi dibuka */ }
+  toast("Pengingat review diaktifkan 🔔");
+  renderHome();
+}
+function disableReminders() {
+  store.settings.remind = false; saveStore();
+  try { navigator.serviceWorker.ready.then(reg => reg.periodicSync && reg.periodicSync.unregister("review-reminder")).catch(() => {}); } catch (e) {}
+  toast("Pengingat dimatikan");
+  renderHome();
+}
+// Tampilkan notifikasi saat ada soal jatuh tempo (maks. sekali per hari).
+function maybeRemindReviews() {
+  if (!remindersOn()) return;
+  const due = dueQuestionIds().length;
+  if (!due) return;
+  const today = dayKey(Date.now());
+  if (store.settings.lastRemind === today) return;
+  try {
+    new Notification(`Review hari ini: ${due} soal 📅`, {
+      body: "Ulang soal yang jatuh tempo agar tetap melekat. Buka Latihan → Review hari ini.",
+      icon: "icon.svg", tag: "review-reminder",
+    });
+    store.settings.lastRemind = today; saveStore();
+  } catch (e) { /* abaikan */ }
+}
+
 // Kartu target harian dengan cincin progres (SVG, tanpa CSS tambahan).
 function dailyGoalCard() {
   const goal = dailyGoalValue(), done = todayCount();
@@ -979,13 +1023,20 @@ function dailyGoalCard() {
   const msg = met
     ? `🎉 Target hari ini tercapai! ${done} soal — jaga streak-mu besok.`
     : `Tinggal ${goal - done} soal lagi untuk capai target hari ini. Sedikit demi sedikit, konsisten menang.`;
+  const remindBtn = !notifySupported() ? null
+    : remindersOn()
+      ? el("button", { class: "btn sm", title: "Matikan pengingat", onclick: disableReminders }, "🔔 Pengingat aktif")
+      : el("button", { class: "btn sm", title: "Dapatkan notifikasi saat ada review jatuh tempo", onclick: enableReminders }, "🔕 Aktifkan pengingat");
   return el("div", { class: "focus-banner", style: "margin-bottom:14px" }, [
     ring,
     el("div", { style: "flex:1" }, [
       el("strong", {}, "Target Belajar Harian"),
       el("div", { style: "font-size:13px" }, msg),
     ]),
-    el("button", { class: "btn sm", onclick: editGoal }, "Atur target"),
+    el("div", { class: "btn-row", style: "flex-direction:column;gap:6px;flex:none" }, [
+      el("button", { class: "btn sm", onclick: editGoal }, "Atur target"),
+      remindBtn,
+    ]),
   ]);
 }
 function renderHome() {
@@ -3010,4 +3061,5 @@ if (!isLoggedIn()) {
 } else {
   go("home");
   syncOnLogin({ silent: true });         // tarik konten pusat + progres
+  maybeRemindReviews();                  // notifikasi bila ada review jatuh tempo (jika diaktifkan)
 }
