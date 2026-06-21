@@ -825,6 +825,72 @@ function weakestSubjects(limit = 3) {
     .slice(0, limit)
     .map(m => m.subject);
 }
+const MIN_SUBTOPIC_ATTEMPTS = 3; // ambang "cukup data" agar akurasi per sub-topik bermakna
+// Penguasaan per sub-topik di dalam satu mata uji, plus rincian per level kesulitan.
+// { subtopic, answered, correct, accuracy, qCount, byDiff: {1:{a,c},2:{a,c},3:{a,c}} }
+function subtopicMastery(subject) {
+  const qBy = {}, qCount = {};
+  store.questions.forEach(q => {
+    if ((q.subject || "Lainnya") !== subject) return;
+    qBy[q.id] = q;
+    const k = q.subtopic || "Umum"; qCount[k] = (qCount[k] || 0) + 1;
+  });
+  const agg = {};
+  Object.entries(store.qstats).forEach(([qId, st]) => {
+    const q = qBy[qId]; if (!q) return;
+    const k = q.subtopic || "Umum";
+    const a = agg[k] || (agg[k] = { subtopic: k, answered: 0, correct: 0, byDiff: { 1: { a: 0, c: 0 }, 2: { a: 0, c: 0 }, 3: { a: 0, c: 0 } } });
+    const ans = st.correct + st.wrong;
+    a.answered += ans; a.correct += st.correct;
+    if (q.difficulty) { a.byDiff[q.difficulty].a += ans; a.byDiff[q.difficulty].c += st.correct; }
+  });
+  return Object.values(agg).map(a => ({
+    ...a, qCount: qCount[a.subtopic] || 0,
+    accuracy: a.answered > 0 ? Math.round((a.correct / a.answered) * 100) : null,
+  }));
+}
+// Tipe celah berbasis kesulitan: bedakan "fondasi" (gagal di soal mudah → baca materi)
+// dari "naik level" (mudah/sedang lancar, jatuh di sulit → latih soal sulit).
+// Mengembalikan null bila data per level belum cukup untuk menyimpulkan.
+function subtopicGapKind(s) {
+  const acc = (d) => s.byDiff[d].a >= MIN_SUBTOPIC_ATTEMPTS ? (s.byDiff[d].c / s.byDiff[d].a) * 100 : null;
+  const easy = acc(1), mid = acc(2), hard = acc(3);
+  const lowBase = [easy, mid].filter(v => v != null);
+  if (lowBase.length && lowBase.every(v => v < 60)) return "foundation"; // gagal bahkan di mudah/sedang
+  if ((easy == null || easy >= 70) && (mid == null || mid >= 60) && hard != null && hard < 60) return "stretch"; // siap naik level
+  return null;
+}
+// Heatmap sub-topik untuk satu mata uji (dipakai di Statistik). null bila belum ada data tertandai.
+function subtopicHeat(subject) {
+  const withData = subtopicMastery(subject)
+    .filter(s => s.subtopic !== "Umum" && s.answered >= MIN_SUBTOPIC_ATTEMPTS)
+    .sort((a, b) => (a.accuracy ?? 999) - (b.accuracy ?? 999));
+  if (!withData.length) return null;
+  const chips = el("div", { class: "sth-chips" }, withData.map(s =>
+    el("button", { class: "sth-chip " + accTone(s.accuracy), title: `${s.correct}/${s.answered} benar — klik untuk latih topik ini`,
+      onclick: () => startPractice("subtopic", { subject, subtopic: s.subtopic, title: s.subtopic }) },
+      `${s.subtopic} · ${s.accuracy}%`)));
+  const wrap = el("div", { class: "subtopic-heat" }, [el("div", { class: "sth-label" }, "Per sub-topik"), chips]);
+
+  const weakest = withData[0];
+  if (weakest.accuracy != null && weakest.accuracy < 65) {
+    const kind = subtopicGapKind(weakest);
+    if (kind === "stretch") {
+      wrap.appendChild(el("div", { class: "sth-insight" }, [
+        el("span", {}, `🚀 ${weakest.subtopic}: dasar sudah oke, jatuhnya di soal sulit — latih level Sulit.`),
+        el("button", { class: "btn sm", onclick: () => startPractice("subtopic", { subject, subtopic: weakest.subtopic, difficulty: 3, title: weakest.subtopic + " · Sulit" }) }, "🔴 Latih sulit"),
+      ]));
+    } else { // "foundation" atau tak cukup data per level → arahkan ke materi (aman & paling membantu)
+      wrap.appendChild(el("div", { class: "sth-insight" }, [
+        el("span", {}, kind === "foundation"
+          ? `🧱 ${weakest.subtopic}: lemah di dasar — kuatkan konsepnya dulu.`
+          : `🎯 ${weakest.subtopic} paling lemah (${weakest.accuracy}%).`),
+        el("button", { class: "btn sm", onclick: () => go("materi", { subject, topic: weakest.subtopic }) }, "📘 Buka materi"),
+      ]));
+    }
+  }
+  return wrap;
+}
 // Skor prioritas SRS: makin tinggi = makin perlu dilatih.
 function srsPriority(qId) {
   const st = store.qstats[qId];
@@ -1051,7 +1117,7 @@ function go(view, arg) {
   else if (view === "stats") renderStats();
   else if (view === "input") renderInput(arg);
   else if (view === "bank") renderBank();
-  else if (view === "materi") renderMateri();
+  else if (view === "materi") renderMateri(arg);
   else if (view === "achievements") renderAchievements();
   else if (view === "exam") renderExam();
   else if (view === "result") renderResult(arg);
@@ -1661,7 +1727,8 @@ function materiAcc(title, build) {
 }
 
 // Konten satu mata uji: intro + accordion pengetahuan dasar + accordion topik soal.
-function materiContent(subject, count) {
+// openTopic (opsional): judul topik yang dibuka & disorot otomatis (deep-link dari Statistik).
+function materiContent(subject, count, openTopic) {
   const m = MATERI[subject];
   const wrap = el("div", { class: "card materi-content" });
   wrap.appendChild(el("div", { class: "materi-content-head" }, [
@@ -1692,10 +1759,14 @@ function materiContent(subject, count) {
   }
 
   wrap.appendChild(el("div", { class: "materi-section-label" }, "🎯 Topik Soal & Strategi"));
-  m.topics.forEach(t => wrap.appendChild(materiAcc(t.h, body => {
-    body.appendChild(el("ul", { class: "materi-list" }, t.points.map(p => el("li", {}, p))));
-    if (t.example) body.appendChild(el("div", { class: "materi-example" }, [el("strong", {}, "Contoh soal: "), t.example]));
-  })));
+  m.topics.forEach(t => {
+    const acc = materiAcc(t.h, body => {
+      body.appendChild(el("ul", { class: "materi-list" }, t.points.map(p => el("li", {}, p))));
+      if (t.example) body.appendChild(el("div", { class: "materi-example" }, [el("strong", {}, "Contoh soal: "), t.example]));
+    });
+    if (openTopic && t.h === openTopic) { acc.setAttribute("open", ""); acc.classList.add("materi-acc-target"); }
+    wrap.appendChild(acc);
+  });
 
   if (count != null && count > 0 && isAdmin()) {
     wrap.appendChild(el("div", { class: "btn-row", style: "margin-top:16px" }, [
@@ -1707,7 +1778,10 @@ function materiContent(subject, count) {
 
 let materiSubject = null; // mata uji yang sedang dibuka di tab Materi
 
-function renderMateri() {
+function renderMateri(arg) {
+  // Deep-link dari Statistik: { subject, topic } → buka tab & sorot topik tsb.
+  let openTopic = null;
+  if (arg && arg.subject) { materiSubject = arg.subject; openTopic = arg.topic || null; }
   const root = app();
   root.innerHTML = "";
   document.body.classList.remove("auth-screen");
@@ -1745,7 +1819,11 @@ function renderMateri() {
 
   // Konten mata uji aktif.
   const active = list.find(x => x.subject === materiSubject);
-  root.appendChild(materiContent(active.subject, active.count));
+  root.appendChild(materiContent(active.subject, active.count, openTopic));
+  if (openTopic) {
+    const target = root.querySelector(".materi-acc-target");
+    if (target && target.scrollIntoView) setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+  }
 }
 
 /* =========================================================================
@@ -2552,7 +2630,7 @@ function renderStats() {
     const card = el("div", { class: "card", style: "margin-bottom:18px" }, [el("h3", { style: "margin-top:0" }, "Penguasaan per Mata Uji")]);
     mastery.forEach(m => {
       const acc = m.accuracy ?? 0, tone = accTone(m.accuracy);
-      card.appendChild(el("div", { class: "mastery-row" }, [
+      const row = el("div", { class: "mastery-row" }, [
         el("div", { class: "mr-head" }, [el("strong", {}, m.subject), el("span", { class: "mr-acc " + tone }, m.accuracy == null ? "–" : m.accuracy + "%")]),
         el("div", { class: "meter" }, [el("div", { class: "meter-fill " + tone, style: `width:${acc}%` })]),
         el("div", { class: "mr-meta" }, [
@@ -2560,7 +2638,10 @@ function renderStats() {
           el("span", { style: "flex:1" }),
           el("button", { class: "btn sm", onclick: () => startPractice("subject", { subject: m.subject, title: "Latihan " + m.subject }) }, "Latih →"),
         ]),
-      ]));
+      ]);
+      const heat = subtopicHeat(m.subject);
+      if (heat) row.appendChild(heat);
+      card.appendChild(row);
     });
     root.appendChild(card);
   }
@@ -2705,6 +2786,9 @@ function startPractice(mode, opts = {}) {
     ids = [...set];
   }
   else if (mode === "subject") ids = store.questions.filter(q => (q.subject || "Lainnya") === opts.subject).map(q => q.id);
+  else if (mode === "subtopic") ids = store.questions.filter(q =>
+    (q.subject || "Lainnya") === opts.subject && (q.subtopic || "Umum") === opts.subtopic &&
+    (opts.difficulty == null || q.difficulty === opts.difficulty)).map(q => q.id);
   else if (mode === "weakness") { const subs = new Set(weakestSubjects(3)); ids = store.questions.filter(q => subs.has(q.subject || "Lainnya")).map(q => q.id); }
   else ids = store.questions.map(q => q.id);
 
@@ -2717,10 +2801,11 @@ function startPractice(mode, opts = {}) {
       : mode === "leech" ? "Tidak ada soal bandel — kerja bagus! 🎉"
       : mode === "micro" ? "Belum ada soal untuk direview. Coba kerjakan beberapa soal dulu 👍"
       : mode === "weakness" ? "Kerjakan beberapa soal dulu — kelemahanmu akan terdeteksi otomatis 👍"
+      : mode === "subtopic" ? "Belum ada soal untuk topik ini"
       : "Belum ada soal");
     return;
   }
-  if (mode === "subject" || mode === "new") qs = shuffle(qs);
+  if (mode === "subject" || mode === "subtopic" || mode === "new") qs = shuffle(qs);
   else qs = interleaveBySubject(qs.slice().sort((a, b) => srsPriority(b.id) - srsPriority(a.id))); // prioritas SRS + selang-seling mata uji
   qs = qs.slice(0, mode === "micro" ? 7 : 25);
   const prepared = qs.map(q => prepareQuestion(q, true));
