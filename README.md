@@ -56,6 +56,8 @@ File import berupa **JSON** berisi satu objek dengan dua array: `packages` dan `
 |-------|-------|------------|
 | `packageId` | tidak | Harus sama dengan `id` paket pemiliknya. Jika kosong/tak cocok, soal masuk ke paket pertama. |
 | `subject` | disarankan | Nama mata uji (mis. `"Kemampuan Verbal"`). Menentukan pengelompokan sesi & rincian skor. |
+| `subtopic` | tidak | Sub-topik di dalam mata uji (mis. `"Analogi (Padanan Hubungan)"`). Untuk evaluasi & latihan per topik. Cocokkan dengan judul topik di **Materi** agar tertaut otomatis. Kosong = belum ditandai. |
+| `difficulty` | tidak | Tingkat kesulitan: `1` Mudah, `2` Sedang, `3` Sulit. Untuk prediksi skor & latihan zona tantangan. Kosong/`null` = belum ditandai. |
 | `text` | ya | Teks pertanyaan. Gunakan `\n` untuk baris baru. |
 | `options` | ya | Array 2–5 pilihan, urutan = A, B, C, D, E. |
 | `answer` | ya | Kunci jawaban. Boleh huruf `"A"`–`"E"` **atau** angka indeks `0`–`4` (0 = A). |

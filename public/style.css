@@ -543,6 +543,8 @@ table.subj th { background: var(--surface-soft); }
 .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; align-items: center; }
 .toolbar .spacer { flex: 1; }
 .tag { font-size: 11px; background: var(--surface-mute); padding: 2px 8px; border-radius: 6px; color: var(--ui-ink-soft); }
+.tag.sub-tag { background: var(--chip-warm); color: var(--warm-ink); }
+.tag.diff-tag { background: transparent; border: 1px solid var(--border); }
 .bank-item { display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-bottom: 1px solid var(--border); }
 .bank-item:last-child { border-bottom: none; }
 .bank-item .qn { font-weight: 700; color: var(--ui-ink-soft); flex: none; }
@@ -763,4 +765,15 @@ body.auth-screen main { max-width: none; margin: 0; padding: 0; }
   .toast, body, .btn, .choice, .nav-cell, .pkg-card, .theme-toggle { transition: none; }
   .card, .score-hero, .stat-cards, .focus-banner, .record-banner, .lightbox { animation: none; }
   .materi-head::after, .bank-materi[open] > summary::after, .materi-card[open] .materi-head::after { transition: none; }
+  .diff-btn { transition: none; }
 }
+
+/* Segmented control tingkat kesulitan (editor soal) */
+.diff-seg { display: flex; gap: 8px; flex-wrap: wrap; }
+.diff-btn {
+  flex: 1 1 0; min-width: 92px; padding: 9px 10px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--ui-ink); border-radius: 10px; cursor: pointer;
+  font-size: 14px; font-weight: 600; transition: background .15s, border-color .15s;
+}
+.diff-btn:hover { background: var(--hov); }
+.diff-btn.active { background: var(--sel); border-color: var(--ui-yellow-dark); }
