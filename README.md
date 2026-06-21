@@ -14,6 +14,7 @@ Buka file **`index.html`** dengan klik dua kali (atau klik kanan → Open With �
 - **Mode kalibrasi keyakinan (baru, metakognisi)** — saat latihan, setelah memilih jawaban kamu menilai keyakinan: **💪 Yakin / 🤔 Ragu / 🎲 Tebak** (klik atau tombol `Y`/`R`/`T`) sebelum kunci terbuka. Aplikasi mencocokkan rasa yakin dengan kebenaran jawaban, lalu di Statistik muncul kartu **Kalibrasi Keyakinan** + wawasan otomatis (mis. *“saat 'Yakin' kamu benar 40% — cenderung terlalu percaya diri”*). Melatih kesadaran diri: tahu apa yang benar-benar dikuasai vs sekadar merasa tahu. Bisa dimatikan lewat toggle di halaman Latihan.
 - **Rumus matematika & gambar (baru)** — tulis rumus dengan mengapit `$...$` (mis. `$\frac{a}{b}$`, `$x^2$`, `$\sqrt{x}$`, `$\pi$`, `$\leq$`) — langsung tampil rapi di soal, pilihan, & pembahasan, **tanpa internet/instalasi**. Klik gambar soal untuk **memperbesar (zoom)**.
 - **Statistik (baru)** — dashboard belajar: **streak hari beruntun**, **review jatuh tempo hari ini**, **akurasi keseluruhan**, jumlah soal dikerjakan, **Jadwal Review** (perkiraan soal jatuh tempo 7 hari ke depan + tombol mulai review), **penguasaan per mata uji** (bar akurasi + waktu rata-rata per soal, terlemah di atas dengan tombol *Latih*), dan **tren skor** per paket dalam grafik. Saat ujian, **waktu per soal** ikut terekam dan muncul di rincian hasil.
+- **Evaluasi per sub-topik (baru)** — di bawah tiap mata uji di Statistik muncul **heatmap sub-topik** (mis. *Deret 83% · Peluang 63%*, terlemah di depan, warna hijau/kuning/merah). Klik chip untuk **latih topik itu** langsung. Bila soal punya **tingkat kesulitan**, aplikasi membedakan celah **fondasi** (gagal di soal mudah → tombol *Buka materi* yang langsung menyorot topik terkait) dari **siap naik level** (dasar oke, jatuh di soal sulit → tombol *Latih sulit*). Sub-topik & kesulitan ditandai admin di Input Soal (atau via field `subtopic`/`difficulty` saat import); heatmap baru muncul setelah ada cukup data per topik.
 - **Dua mode waktu (dipilih per paket):**
   - **Per mata uji (sesi terpisah & terkunci)** — tiap mata uji punya waktu sendiri; begitu pindah sesi tidak bisa kembali ke mata uji sebelumnya (seperti CBT SIMAK UI Pascasarjana).
   - **Satu timer global** — semua soal dalam satu waktu total, bebas berpindah antar mata uji.
@@ -56,6 +57,8 @@ File import berupa **JSON** berisi satu objek dengan dua array: `packages` dan `
 |-------|-------|------------|
 | `packageId` | tidak | Harus sama dengan `id` paket pemiliknya. Jika kosong/tak cocok, soal masuk ke paket pertama. |
 | `subject` | disarankan | Nama mata uji (mis. `"Kemampuan Verbal"`). Menentukan pengelompokan sesi & rincian skor. |
+| `subtopic` | tidak | Sub-topik di dalam mata uji (mis. `"Analogi (Padanan Hubungan)"`). Untuk evaluasi & latihan per topik. Cocokkan dengan judul topik di **Materi** agar tertaut otomatis. Kosong = belum ditandai. |
+| `difficulty` | tidak | Tingkat kesulitan: `1` Mudah, `2` Sedang, `3` Sulit. Untuk prediksi skor & latihan zona tantangan. Kosong/`null` = belum ditandai. |
 | `text` | ya | Teks pertanyaan. Gunakan `\n` untuk baris baru. |
 | `options` | ya | Array 2–5 pilihan, urutan = A, B, C, D, E. |
 | `answer` | ya | Kunci jawaban. Boleh huruf `"A"`–`"E"` **atau** angka indeks `0`–`4` (0 = A). |

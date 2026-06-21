@@ -11,6 +11,9 @@ const SCORE = { correct: 4, wrong: -1, empty: 0 };
 const PRESET_SUBJECTS = ["Kemampuan Verbal", "Kemampuan Kuantitatif", "Kemampuan Penalaran", "Bahasa Inggris"];
 const DEFAULT_SECTION_MIN = 30;
 const SRS_DAY = 86400000; // 1 hari dalam ms (penjadwalan spaced repetition)
+// Level kesulitan per soal (ditandai admin). null = belum ditandai.
+const DIFFICULTY = { 1: { label: "Mudah", icon: "🟢" }, 2: { label: "Sedang", icon: "🟡" }, 3: { label: "Sulit", icon: "🔴" } };
+const DIFFICULTY_LEVELS = [1, 2, 3];
 
 /* Materi pembelajaran per jenis soal (mata uji). Ditautkan ke nama subject. */
 const MATERI = {
@@ -469,6 +472,10 @@ function normalizeStore(s) {
     if (p.shuffleQuestions == null) p.shuffleQuestions = true;
     if (p.shuffleOptions == null) p.shuffleOptions = true;
   });
+  s.questions.forEach(q => { // sub-topik & kesulitan: default aman untuk soal lama
+    if (q.subtopic == null) q.subtopic = "";
+    if (q.difficulty !== 1 && q.difficulty !== 2 && q.difficulty !== 3) q.difficulty = null;
+  });
   Object.values(s.qstats).forEach(migrateSrs); // beri jadwal SRS pada data lama
   return s;
 }
@@ -494,6 +501,8 @@ function prepareImported(data) {
     if (!Array.isArray(q.options)) q.options = [];
     if (q.image == null) q.image = "";
     if (q.subject == null) q.subject = "";
+    if (q.subtopic == null) q.subtopic = ""; // sub-topik dalam mata uji (opsional, "" = Umum/belum ditandai)
+    if (q.difficulty !== 1 && q.difficulty !== 2 && q.difficulty !== 3) q.difficulty = null; // level kesulitan (null = belum ditandai)
     if (q.pembahasan == null) q.pembahasan = "";
     if (!Array.isArray(q.optExplain)) q.optExplain = []; // penjelasan per pilihan (kenapa salah)
     if (!Array.isArray(q.steps)) q.steps = []; // pembahasan langkah-demi-langkah (opsional)
@@ -512,34 +521,34 @@ function seedStore() {
     }],
     questions: [
       // ----- TPA: Kemampuan Verbal -----
-      { id: uid(), packageId: pkgId, subject: "Kemampuan Verbal",
+      { id: uid(), packageId: pkgId, subject: "Kemampuan Verbal", subtopic: "Sinonim (Padanan Kata)", difficulty: 1,
         text: "Sinonim kata KONVERGEN adalah ...", image: "",
         options: ["Memusat", "Menyebar", "Melebar", "Berbeda", "Bercabang"], answer: 0,
         optExplain: ["Tepat — konvergen = mengumpul ke satu titik.", "Ini justru makna DIVERGEN, lawan katanya.", "Sama arah dengan 'menyebar' — menjauh dari satu titik.", "Terlalu umum; tidak menangkap arti 'memusat'.", "Bercabang = memencar, kebalikan dari konvergen."],
         pembahasan: "Konvergen berarti menuju satu titik pertemuan / memusat. Lawan katanya divergen (menyebar). Jawaban: A." },
-      { id: uid(), packageId: pkgId, subject: "Kemampuan Verbal",
+      { id: uid(), packageId: pkgId, subject: "Kemampuan Verbal", subtopic: "Analogi (Padanan Hubungan)", difficulty: 2,
         text: "DOKTER : STETOSKOP = PELUKIS : ...", image: "",
         options: ["Kanvas", "Warna", "Kuas", "Galeri", "Lukisan"], answer: 2,
         pembahasan: "Stetoskop adalah alat kerja utama dokter; alat kerja utama pelukis adalah kuas. Jawaban: C." },
       // ----- TPA: Kemampuan Kuantitatif -----
-      { id: uid(), packageId: pkgId, subject: "Kemampuan Kuantitatif",
+      { id: uid(), packageId: pkgId, subject: "Kemampuan Kuantitatif", subtopic: "Deret Angka & Pola", difficulty: 1,
         text: "Suku berikutnya dari deret 3, 6, 12, 24, ... adalah ...", image: "",
         options: ["30", "36", "42", "48", "54"], answer: 3,
         pembahasan: "Setiap suku dikali 2: 24 × 2 = 48. Jawaban: D." },
-      { id: uid(), packageId: pkgId, subject: "Kemampuan Kuantitatif",
+      { id: uid(), packageId: pkgId, subject: "Kemampuan Kuantitatif", subtopic: "Rata-rata & Statistik", difficulty: 2,
         text: "Jika rata-rata 5 bilangan adalah 14, dan satu bilangan dihapus sehingga rata-ratanya menjadi 12, maka bilangan yang dihapus adalah ...", image: "",
         options: ["18", "20", "22", "24", "26"], answer: 2,
         pembahasan: "Jumlah 5 bilangan $= 5 \\times 14 = 70$. Jumlah 4 bilangan $= 4 \\times 12 = 48$. Bilangan yang dihapus $= 70 - 48 = 22$. Jawaban: C." },
-      { id: uid(), packageId: pkgId, subject: "Kemampuan Kuantitatif",
+      { id: uid(), packageId: pkgId, subject: "Kemampuan Kuantitatif", subtopic: "Pecahan, Persen & Rasio", difficulty: 1,
         text: "Hasil dari $\\frac{3}{4} + \\frac{1}{6}$ adalah ...", image: "",
         options: ["$\\frac{11}{12}$", "$\\frac{4}{10}$", "$\\frac{5}{6}$", "$\\frac{7}{12}$", "$1$"], answer: 0,
         pembahasan: "Samakan penyebut ke 12: $\\frac{3}{4} = \\frac{9}{12}$ dan $\\frac{1}{6} = \\frac{2}{12}$. Jumlahnya $\\frac{9}{12} + \\frac{2}{12} = \\frac{11}{12}$. Jawaban: A." },
-      { id: uid(), packageId: pkgId, subject: "Kemampuan Kuantitatif",
+      { id: uid(), packageId: pkgId, subject: "Kemampuan Kuantitatif", subtopic: "Aljabar & Soal Cerita", difficulty: 3,
         text: "Jika $x^2 = 144$ dan $x > 0$, maka nilai $\\sqrt{x} \\times 3$ adalah ...", image: "",
         options: ["$36$", "$\\sqrt{12}$", "$3\\sqrt{12}$", "$12$", "$6\\sqrt{3}$"], answer: 2,
         pembahasan: "Dari $x^2 = 144$ dan $x>0$ diperoleh $x = 12$. Maka $\\sqrt{x} \\times 3 = 3\\sqrt{12}$. Jawaban: C." },
       // ----- TPA: Kemampuan Penalaran -----
-      { id: uid(), packageId: pkgId, subject: "Kemampuan Penalaran",
+      { id: uid(), packageId: pkgId, subject: "Kemampuan Penalaran", subtopic: "Silogisme Kategoris", difficulty: 2,
         text: "Semua dokter spesialis pernah menjadi dokter umum. Sebagian dokter umum mengambil PPDS. Kesimpulan yang PASTI benar adalah ...", image: "",
         options: [
           "Semua dokter umum menjadi spesialis",
@@ -550,11 +559,11 @@ function seedStore() {
         ], answer: 1,
         pembahasan: "Hanya pernyataan B yang konsisten dengan premis; opsi lain overgeneralisasi atau bertentangan dengan premis. Jawaban: B." },
       // ----- Bahasa Inggris -----
-      { id: uid(), packageId: pkgId, subject: "Bahasa Inggris",
+      { id: uid(), packageId: pkgId, subject: "Bahasa Inggris", subtopic: "Articles & Quantifiers", difficulty: 2,
         text: "The committee has not yet reached a decision, and it may take ___ more time to do so.\n\nChoose the best option to complete the sentence.", image: "",
         options: ["little", "few", "a little", "a few", "fewer"], answer: 2,
         pembahasan: "'Time' adalah kata benda tak terhitung dan kalimatnya bermakna positif, sehingga dipakai 'a little'. Jawaban: C." },
-      { id: uid(), packageId: pkgId, subject: "Bahasa Inggris",
+      { id: uid(), packageId: pkgId, subject: "Bahasa Inggris", subtopic: "Parallelism & Word Form", difficulty: 2,
         text: "The patient's symptoms were ___ with the initial diagnosis, so no further tests were ordered.\n\nChoose the best word.", image: "",
         options: ["consistent", "consist", "consistence", "consisting", "consisted"], answer: 0,
         pembahasan: "'be consistent with' = sesuai/selaras dengan. Bentuk yang tepat adalah adjektiva 'consistent'. Jawaban: A." },
@@ -587,6 +596,53 @@ function subjectsOf(pkgId) {
   questionsOf(pkgId).forEach(q => { const s = q.subject || "Lainnya"; if (!order.includes(s)) order.push(s); });
   return order;
 }
+// Daftar sub-topik untuk sebuah mata uji = judul topik di materi (satu sumber kebenaran).
+// Mata uji tanpa materi bawaan → [] (editor jatuh ke input teks bebas).
+function subtopicsOf(subject) {
+  const m = MATERI[subject];
+  return m && Array.isArray(m.topics) ? m.topics.map(t => t.h) : [];
+}
+// Saran sub-topik otomatis dari kata kunci pada teks soal (pra-isi dropdown; admin bisa ubah).
+// Cocokkan kata kunci ke salah satu judul topik yang valid bagi mata uji ini.
+const SUBTOPIC_HINTS = [
+  [/\bsinonim|padanan kata|≈|setara makna/i, "Sinonim"],
+  [/\bantonim|lawan kata|kebalikan/i, "Antonim"],
+  [/\banalogi|:\s*\w+\s*=|berhubungan dengan|seperti hubungan/i, "Analogi"],
+  [/\bpengelompokan|tidak termasuk|bukan kelompok|kecuali/i, "Pengelompokan"],
+  [/\bderet|barisan|suku berikut|pola angka/i, "Deret"],
+  [/\bpersen|pecahan|rasio|perbandingan|%/i, "Pecahan"],
+  [/\brata-rata|median|modus|statistik/i, "Rata-rata"],
+  [/\baljabar|persamaan|jika\s+x|nilai\s+x|soal cerita/i, "Aljabar"],
+  [/\bkecepatan|jarak|tempuh|debit|lama kerja|bersama/i, "Kecepatan"],
+  [/\bpeluang|probabilitas|kombinasi|permutasi|kemungkinan/i, "Peluang"],
+  [/\bgeometri|luas|keliling|volume|sudut|segitiga/i, "Geometri"],
+  [/\bjika.*maka|implikasi|proposisi/i, "Proposisi"],
+  [/\bsilogisme|semua.*adalah|premis/i, "Silogisme"],
+  [/\bsemua|sebagian|tidak ada|negasi|kuantor/i, "Kuantifikasi"],
+  [/\burutan|posisi|duduk|jadwal|lebih tinggi|sebelah/i, "Penalaran Analitis"],
+  [/\bhimpunan|diagram venn|irisan|gabungan/i, "Himpunan"],
+  [/\btense|verb|past|present|future|had been|has been/i, "Tenses"],
+  [/\bagreement|subject.?verb|do(es)? not agree/i, "Agreement"],
+  [/\barticle|a\b.*an\b.*the|quantifier|much|many/i, "Articles"],
+  [/\bpreposition|collocation|\bin\b.*\bon\b.*\bat\b/i, "Preposition"],
+  [/\bparallel|word form|paralelisme/i, "Parallelism"],
+  [/\bif\b.*would|conditional|pengandaian/i, "Conditional"],
+  [/\breading|passage|bacaan|wacana|paragraf|in context/i, "Reading"],
+];
+function suggestSubtopic(subject, text) {
+  const topics = subtopicsOf(subject);
+  if (!topics.length || !text) return "";
+  const s = String(text);
+  for (const [re, key] of SUBTOPIC_HINTS) {
+    if (!re.test(s)) continue;
+    const hit = topics.find(t => t.toLowerCase().includes(key.toLowerCase()));
+    if (hit) return hit;
+  }
+  return "";
+}
+// Chip kecil untuk menandai sub-topik & kesulitan soal di daftar (null bila belum ditandai).
+function subtopicChip(q) { return q && q.subtopic ? el("span", { class: "tag sub-tag" }, q.subtopic) : null; }
+function difficultyChip(q) { const d = q && DIFFICULTY[q.difficulty]; return d ? el("span", { class: "tag diff-tag" }, `${d.icon} ${d.label}`) : null; }
 function truncate(s, n) { s = String(s || ""); return s.length > n ? s.slice(0, n) + "…" : s; }
 /* Huruf kunci jawaban seperti yang tampil di ujian: pilihan kosong difilter,
    jadi huruf dihitung dari posisi di antara pilihan yang terisi. */
@@ -768,6 +824,72 @@ function weakestSubjects(limit = 3) {
     .sort((a, b) => a.accuracy - b.accuracy)
     .slice(0, limit)
     .map(m => m.subject);
+}
+const MIN_SUBTOPIC_ATTEMPTS = 3; // ambang "cukup data" agar akurasi per sub-topik bermakna
+// Penguasaan per sub-topik di dalam satu mata uji, plus rincian per level kesulitan.
+// { subtopic, answered, correct, accuracy, qCount, byDiff: {1:{a,c},2:{a,c},3:{a,c}} }
+function subtopicMastery(subject) {
+  const qBy = {}, qCount = {};
+  store.questions.forEach(q => {
+    if ((q.subject || "Lainnya") !== subject) return;
+    qBy[q.id] = q;
+    const k = q.subtopic || "Umum"; qCount[k] = (qCount[k] || 0) + 1;
+  });
+  const agg = {};
+  Object.entries(store.qstats).forEach(([qId, st]) => {
+    const q = qBy[qId]; if (!q) return;
+    const k = q.subtopic || "Umum";
+    const a = agg[k] || (agg[k] = { subtopic: k, answered: 0, correct: 0, byDiff: { 1: { a: 0, c: 0 }, 2: { a: 0, c: 0 }, 3: { a: 0, c: 0 } } });
+    const ans = st.correct + st.wrong;
+    a.answered += ans; a.correct += st.correct;
+    if (q.difficulty) { a.byDiff[q.difficulty].a += ans; a.byDiff[q.difficulty].c += st.correct; }
+  });
+  return Object.values(agg).map(a => ({
+    ...a, qCount: qCount[a.subtopic] || 0,
+    accuracy: a.answered > 0 ? Math.round((a.correct / a.answered) * 100) : null,
+  }));
+}
+// Tipe celah berbasis kesulitan: bedakan "fondasi" (gagal di soal mudah → baca materi)
+// dari "naik level" (mudah/sedang lancar, jatuh di sulit → latih soal sulit).
+// Mengembalikan null bila data per level belum cukup untuk menyimpulkan.
+function subtopicGapKind(s) {
+  const acc = (d) => s.byDiff[d].a >= MIN_SUBTOPIC_ATTEMPTS ? (s.byDiff[d].c / s.byDiff[d].a) * 100 : null;
+  const easy = acc(1), mid = acc(2), hard = acc(3);
+  const lowBase = [easy, mid].filter(v => v != null);
+  if (lowBase.length && lowBase.every(v => v < 60)) return "foundation"; // gagal bahkan di mudah/sedang
+  if ((easy == null || easy >= 70) && (mid == null || mid >= 60) && hard != null && hard < 60) return "stretch"; // siap naik level
+  return null;
+}
+// Heatmap sub-topik untuk satu mata uji (dipakai di Statistik). null bila belum ada data tertandai.
+function subtopicHeat(subject) {
+  const withData = subtopicMastery(subject)
+    .filter(s => s.subtopic !== "Umum" && s.answered >= MIN_SUBTOPIC_ATTEMPTS)
+    .sort((a, b) => (a.accuracy ?? 999) - (b.accuracy ?? 999));
+  if (!withData.length) return null;
+  const chips = el("div", { class: "sth-chips" }, withData.map(s =>
+    el("button", { class: "sth-chip " + accTone(s.accuracy), title: `${s.correct}/${s.answered} benar — klik untuk latih topik ini`,
+      onclick: () => startPractice("subtopic", { subject, subtopic: s.subtopic, title: s.subtopic }) },
+      `${s.subtopic} · ${s.accuracy}%`)));
+  const wrap = el("div", { class: "subtopic-heat" }, [el("div", { class: "sth-label" }, "Per sub-topik"), chips]);
+
+  const weakest = withData[0];
+  if (weakest.accuracy != null && weakest.accuracy < 65) {
+    const kind = subtopicGapKind(weakest);
+    if (kind === "stretch") {
+      wrap.appendChild(el("div", { class: "sth-insight" }, [
+        el("span", {}, `🚀 ${weakest.subtopic}: dasar sudah oke, jatuhnya di soal sulit — latih level Sulit.`),
+        el("button", { class: "btn sm", onclick: () => startPractice("subtopic", { subject, subtopic: weakest.subtopic, difficulty: 3, title: weakest.subtopic + " · Sulit" }) }, "🔴 Latih sulit"),
+      ]));
+    } else { // "foundation" atau tak cukup data per level → arahkan ke materi (aman & paling membantu)
+      wrap.appendChild(el("div", { class: "sth-insight" }, [
+        el("span", {}, kind === "foundation"
+          ? `🧱 ${weakest.subtopic}: lemah di dasar — kuatkan konsepnya dulu.`
+          : `🎯 ${weakest.subtopic} paling lemah (${weakest.accuracy}%).`),
+        el("button", { class: "btn sm", onclick: () => go("materi", { subject, topic: weakest.subtopic }) }, "📘 Buka materi"),
+      ]));
+    }
+  }
+  return wrap;
 }
 // Skor prioritas SRS: makin tinggi = makin perlu dilatih.
 function srsPriority(qId) {
@@ -995,7 +1117,7 @@ function go(view, arg) {
   else if (view === "stats") renderStats();
   else if (view === "input") renderInput(arg);
   else if (view === "bank") renderBank();
-  else if (view === "materi") renderMateri();
+  else if (view === "materi") renderMateri(arg);
   else if (view === "achievements") renderAchievements();
   else if (view === "exam") renderExam();
   else if (view === "result") renderResult(arg);
@@ -1258,6 +1380,8 @@ function renderInputFor(pkgId) {
         el("div", { class: "qn" }, `${i + 1}.`),
         el("div", { class: "body" }, [
           q.subject ? el("span", { class: "tag" }, q.subject) : null,
+          subtopicChip(q),
+          difficultyChip(q),
           el("div", { style: "margin:6px 0 4px;white-space:pre-wrap" }, truncate(q.text, 160)),
           el("div", { class: "ans" }, `Kunci: ${answerLetter(q)}. ${truncate(q.options[q.answer], 60)}`),
         ]),
@@ -1364,11 +1488,38 @@ function buildQuestionForm(pkgId, existing) {
   [...new Set([...PRESET_SUBJECTS, ...store.questions.map(q => q.subject).filter(Boolean)])]
     .forEach(s => datalist.appendChild(el("option", { value: s })));
 
+  // Sub-topik: input + datalist yang mengikuti mata uji (sumber: judul topik materi).
+  const subtopicInput = el("input", { type: "text", placeholder: "mis. Analogi (opsional)", value: data.subtopic || "", list: "subtoplist" });
+  const subtopicDatalist = el("datalist", { id: "subtoplist" });
+  function refreshSubtopics() {
+    subtopicDatalist.innerHTML = "";
+    subtopicsOf(subjectInput.value.trim()).forEach(t => subtopicDatalist.appendChild(el("option", { value: t })));
+  }
+  refreshSubtopics();
+  subjectInput.addEventListener("input", refreshSubtopics);
+  // Auto-suggest ringan: isi sub-topik saat selesai mengetik soal bila masih kosong.
+  textInput.addEventListener("blur", () => {
+    if (subtopicInput.value.trim()) return;
+    const s = suggestSubtopic(subjectInput.value.trim(), textInput.value);
+    if (s) subtopicInput.value = s;
+  });
+
+  // Tingkat kesulitan: segmented control 3 level, klik lagi untuk kosongkan.
+  let diff = DIFFICULTY_LEVELS.includes(data.difficulty) ? data.difficulty : null;
+  const diffWrap = el("div", { class: "diff-seg" }, DIFFICULTY_LEVELS.map(lv =>
+    el("button", { type: "button", class: "diff-btn" + (diff === lv ? " active" : ""), onclick: function () {
+      diff = (diff === lv) ? null : lv;
+      diffWrap.querySelectorAll(".diff-btn").forEach((x, xi) => x.classList.toggle("active", DIFFICULTY_LEVELS[xi] === diff));
+    } }, `${DIFFICULTY[lv].icon} ${DIFFICULTY[lv].label}`)));
+
   const isEdit = !!existing;
   const form = el("div", { class: "card question-form" }, [
     el("h3", { style: "margin-top:0" }, isEdit ? "✏️ Edit Soal" : "➕ Tambah Soal"),
     datalist,
+    subtopicDatalist,
     field("Mata uji / kategori", subjectInput, "ketik atau pilih"),
+    field("Sub-topik", subtopicInput, "ketik atau pilih — untuk evaluasi & latihan per topik (opsional)"),
+    field("Tingkat kesulitan", diffWrap, "opsional — untuk prediksi skor & latihan zona tantangan"),
     field("Pertanyaan", textInput, "rumus: apit dengan $...$ — mis. $\\frac{a}{b}$, $x^2$, $\\sqrt{x}$, $\\pi$, $\\leq$"),
     field("Gambar", imgInput, "opsional, tempel link gambar"),
     el("div", { class: "field" }, [
@@ -1386,7 +1537,7 @@ function buildQuestionForm(pkgId, existing) {
         if (opts.filter(o => o).length < 2) { toast("Isi minimal 2 pilihan jawaban"); return; }
         if (!opts[correctIdx]) { toast("Pilihan yang ditandai kunci masih kosong"); return; }
         const steps = stepsInput.value.split("\n").map(s => s.trim()).filter(Boolean);
-        const payload = { subject: subjectInput.value.trim(), text, image: imgInput.value.trim(), options: opts, answer: correctIdx, pembahasan: pembInput.value.trim(), optExplain, steps };
+        const payload = { subject: subjectInput.value.trim(), subtopic: subtopicInput.value.trim(), difficulty: diff, text, image: imgInput.value.trim(), options: opts, answer: correctIdx, pembahasan: pembInput.value.trim(), optExplain, steps };
         if (isEdit) { Object.assign(existing, payload); toast("Soal diperbarui"); }
         else { store.questions.push({ id: uid(), packageId: pkgId, ...payload }); toast("Soal ditambahkan"); }
         saveStore(); renderInputFor(pkgId);
@@ -1546,6 +1697,8 @@ function renderBank() {
       el("div", { class: "qn" }, `${i + 1}.`),
       el("div", { class: "body" }, [
         q.subject ? el("span", { class: "tag" }, q.subject) : null,
+        subtopicChip(q),
+        difficultyChip(q),
         el("div", { style: "margin:6px 0;white-space:pre-wrap", html: renderMath(q.text) }),
         el("div", { class: "ans", html: `Kunci: ${answerLetter(q)}. ${renderMath(q.options[q.answer])}` }),
         questionMateri(q),
@@ -1574,7 +1727,8 @@ function materiAcc(title, build) {
 }
 
 // Konten satu mata uji: intro + accordion pengetahuan dasar + accordion topik soal.
-function materiContent(subject, count) {
+// openTopic (opsional): judul topik yang dibuka & disorot otomatis (deep-link dari Statistik).
+function materiContent(subject, count, openTopic) {
   const m = MATERI[subject];
   const wrap = el("div", { class: "card materi-content" });
   wrap.appendChild(el("div", { class: "materi-content-head" }, [
@@ -1605,10 +1759,14 @@ function materiContent(subject, count) {
   }
 
   wrap.appendChild(el("div", { class: "materi-section-label" }, "🎯 Topik Soal & Strategi"));
-  m.topics.forEach(t => wrap.appendChild(materiAcc(t.h, body => {
-    body.appendChild(el("ul", { class: "materi-list" }, t.points.map(p => el("li", {}, p))));
-    if (t.example) body.appendChild(el("div", { class: "materi-example" }, [el("strong", {}, "Contoh soal: "), t.example]));
-  })));
+  m.topics.forEach(t => {
+    const acc = materiAcc(t.h, body => {
+      body.appendChild(el("ul", { class: "materi-list" }, t.points.map(p => el("li", {}, p))));
+      if (t.example) body.appendChild(el("div", { class: "materi-example" }, [el("strong", {}, "Contoh soal: "), t.example]));
+    });
+    if (openTopic && t.h === openTopic) { acc.setAttribute("open", ""); acc.classList.add("materi-acc-target"); }
+    wrap.appendChild(acc);
+  });
 
   if (count != null && count > 0 && isAdmin()) {
     wrap.appendChild(el("div", { class: "btn-row", style: "margin-top:16px" }, [
@@ -1620,7 +1778,10 @@ function materiContent(subject, count) {
 
 let materiSubject = null; // mata uji yang sedang dibuka di tab Materi
 
-function renderMateri() {
+function renderMateri(arg) {
+  // Deep-link dari Statistik: { subject, topic } → buka tab & sorot topik tsb.
+  let openTopic = null;
+  if (arg && arg.subject) { materiSubject = arg.subject; openTopic = arg.topic || null; }
   const root = app();
   root.innerHTML = "";
   document.body.classList.remove("auth-screen");
@@ -1658,7 +1819,11 @@ function renderMateri() {
 
   // Konten mata uji aktif.
   const active = list.find(x => x.subject === materiSubject);
-  root.appendChild(materiContent(active.subject, active.count));
+  root.appendChild(materiContent(active.subject, active.count, openTopic));
+  if (openTopic) {
+    const target = root.querySelector(".materi-acc-target");
+    if (target && target.scrollIntoView) setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+  }
 }
 
 /* =========================================================================
@@ -2465,7 +2630,7 @@ function renderStats() {
     const card = el("div", { class: "card", style: "margin-bottom:18px" }, [el("h3", { style: "margin-top:0" }, "Penguasaan per Mata Uji")]);
     mastery.forEach(m => {
       const acc = m.accuracy ?? 0, tone = accTone(m.accuracy);
-      card.appendChild(el("div", { class: "mastery-row" }, [
+      const row = el("div", { class: "mastery-row" }, [
         el("div", { class: "mr-head" }, [el("strong", {}, m.subject), el("span", { class: "mr-acc " + tone }, m.accuracy == null ? "–" : m.accuracy + "%")]),
         el("div", { class: "meter" }, [el("div", { class: "meter-fill " + tone, style: `width:${acc}%` })]),
         el("div", { class: "mr-meta" }, [
@@ -2473,7 +2638,10 @@ function renderStats() {
           el("span", { style: "flex:1" }),
           el("button", { class: "btn sm", onclick: () => startPractice("subject", { subject: m.subject, title: "Latihan " + m.subject }) }, "Latih →"),
         ]),
-      ]));
+      ]);
+      const heat = subtopicHeat(m.subject);
+      if (heat) row.appendChild(heat);
+      card.appendChild(row);
     });
     root.appendChild(card);
   }
@@ -2618,6 +2786,9 @@ function startPractice(mode, opts = {}) {
     ids = [...set];
   }
   else if (mode === "subject") ids = store.questions.filter(q => (q.subject || "Lainnya") === opts.subject).map(q => q.id);
+  else if (mode === "subtopic") ids = store.questions.filter(q =>
+    (q.subject || "Lainnya") === opts.subject && (q.subtopic || "Umum") === opts.subtopic &&
+    (opts.difficulty == null || q.difficulty === opts.difficulty)).map(q => q.id);
   else if (mode === "weakness") { const subs = new Set(weakestSubjects(3)); ids = store.questions.filter(q => subs.has(q.subject || "Lainnya")).map(q => q.id); }
   else ids = store.questions.map(q => q.id);
 
@@ -2630,10 +2801,11 @@ function startPractice(mode, opts = {}) {
       : mode === "leech" ? "Tidak ada soal bandel — kerja bagus! 🎉"
       : mode === "micro" ? "Belum ada soal untuk direview. Coba kerjakan beberapa soal dulu 👍"
       : mode === "weakness" ? "Kerjakan beberapa soal dulu — kelemahanmu akan terdeteksi otomatis 👍"
+      : mode === "subtopic" ? "Belum ada soal untuk topik ini"
       : "Belum ada soal");
     return;
   }
-  if (mode === "subject" || mode === "new") qs = shuffle(qs);
+  if (mode === "subject" || mode === "subtopic" || mode === "new") qs = shuffle(qs);
   else qs = interleaveBySubject(qs.slice().sort((a, b) => srsPriority(b.id) - srsPriority(a.id))); // prioritas SRS + selang-seling mata uji
   qs = qs.slice(0, mode === "micro" ? 7 : 25);
   const prepared = qs.map(q => prepareQuestion(q, true));

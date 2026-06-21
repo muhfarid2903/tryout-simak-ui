@@ -19,6 +19,8 @@
     {
       "packageId": "paket-contoh",
       "subject": "Kemampuan Verbal",
+      "subtopic": "Sinonim (Padanan Kata)",
+      "difficulty": 1,
       "text": "Sinonim kata RELEVAN adalah ...",
       "options": ["Bertautan", "Acuh", "Ragu", "Sepadan", "Berbeda"],
       "answer": "A",
@@ -36,6 +38,8 @@
     {
       "packageId": "paket-contoh",
       "subject": "Kemampuan Kuantitatif",
+      "subtopic": "Deret Angka & Pola",
+      "difficulty": 2,
       "text": "Suku berikutnya dari deret 2, 5, 10, 17, ... adalah ...",
       "options": ["24", "26", "28", "30", "32"],
       "answer": 1,
