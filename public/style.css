@@ -789,3 +789,19 @@ body.auth-screen main { max-width: none; margin: 0; padding: 0; }
 }
 .diff-btn:hover { background: var(--hov); }
 .diff-btn.active { background: var(--sel); border-color: var(--ui-yellow-dark); }
+
+/* Tandai massal (bulk-tag) */
+.tb-row { padding: 10px 0; border-top: 1px solid var(--border); }
+.tb-row:first-of-type { border-top: none; }
+.tb-row.tb-done { opacity: .6; }
+.tb-text { font-size: 13.5px; margin-bottom: 8px; white-space: pre-wrap; }
+.tb-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.tb-sub { flex: 1 1 200px; min-width: 160px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ui-ink); }
+.tb-diff { flex: 2 1 280px; }
+.tb-diff .diff-btn { min-width: 78px; padding: 7px 8px; font-size: 13px; }
+
+/* Ajakan remediasi (tautan materi saat salah) */
+.remediation { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; padding: 9px 12px; border-radius: 10px; background: var(--warm-bg); border: 1px solid var(--warm-border); }
+.remediation .rem-ic { font-size: 17px; }
+.remediation .rem-txt { flex: 1; min-width: 140px; font-size: 13px; font-weight: 600; color: var(--warm-ink); }
+.materi-li-active { font-weight: 700; color: var(--warm-ink); }
