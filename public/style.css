@@ -270,6 +270,7 @@ main {
   border: 1px solid transparent;
 }
 .chip.yellow { background: var(--chip-warm); color: var(--warm-ink); }
+.chip.hc-chip { background: var(--red-bg); color: var(--red); font-weight: 600; }
 
 /* ---------- Buttons ---------- */
 .btn {
