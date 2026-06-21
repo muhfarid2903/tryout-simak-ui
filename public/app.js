@@ -643,6 +643,17 @@ function suggestSubtopic(subject, text) {
 // Chip kecil untuk menandai sub-topik & kesulitan soal di daftar (null bila belum ditandai).
 function subtopicChip(q) { return q && q.subtopic ? el("span", { class: "tag sub-tag" }, q.subtopic) : null; }
 function difficultyChip(q) { const d = q && DIFFICULTY[q.difficulty]; return d ? el("span", { class: "tag diff-tag" }, `${d.icon} ${d.label}`) : null; }
+// Ajakan remediasi saat jawab salah: tautan langsung ke materi topik soal ini
+// (deep-link ke sub-topik bila tertandai). null bila mata uji tak punya materi.
+function remediationLink(q) {
+  if (!q || !MATERI[q.subject]) return null;
+  const hasTopic = q.subtopic && subtopicsOf(q.subject).includes(q.subtopic);
+  return el("div", { class: "remediation" }, [
+    el("span", { class: "rem-ic" }, "📘"),
+    el("span", { class: "rem-txt" }, hasTopic ? `Perkuat topik: ${q.subtopic}` : `Perkuat: ${q.subject}`),
+    el("button", { class: "btn sm", onclick: () => go("materi", hasTopic ? { subject: q.subject, topic: q.subtopic } : { subject: q.subject }) }, "Buka materi →"),
+  ]);
+}
 function truncate(s, n) { s = String(s || ""); return s.length > n ? s.slice(0, n) + "…" : s; }
 /* Huruf kunci jawaban seperti yang tampil di ujian: pilihan kosong difilter,
    jadi huruf dihitung dari posisi di antara pilihan yang terisi. */
@@ -1098,7 +1109,7 @@ let practiceState = null;
 let _activeQ = null, _tickStart = 0; // pelacakan waktu per soal saat ujian
 
 const NAV_VIEWS = ["home", "practice", "stats", "input", "bank", "materi", "achievements", "adminresults", "adminusers", "account"];
-const ADMIN_VIEWS = ["input", "bank", "adminusers", "adminresults"];
+const ADMIN_VIEWS = ["input", "bank", "adminusers", "adminresults", "tagbulk"];
 let currentView = "home";
 function setNav(view) {
   document.querySelectorAll(".navbtn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
@@ -1116,6 +1127,7 @@ function go(view, arg) {
   else if (view === "practice") renderPractice(arg);
   else if (view === "stats") renderStats();
   else if (view === "input") renderInput(arg);
+  else if (view === "tagbulk") renderTagBulk();
   else if (view === "bank") renderBank();
   else if (view === "materi") renderMateri(arg);
   else if (view === "achievements") renderAchievements();
@@ -1344,6 +1356,7 @@ function renderInput(focusPkgId) {
     select,
     el("button", { class: "btn sm", onclick: () => newPackage() }, "+ Paket Baru"),
     el("span", { class: "spacer" }),
+    el("button", { class: "btn sm", onclick: () => go("tagbulk") }, "🏷️ Tandai massal"),
     el("button", { class: "btn sm", onclick: exportJSON }, "⬇ Export"),
     el("button", { class: "btn sm", onclick: importJSON }, "⬆ Import"),
   ]));
@@ -1548,6 +1561,78 @@ function buildQuestionForm(pkgId, existing) {
   return form;
 }
 
+/* ---------- Tandai Massal (bulk-tag sub-topik & kesulitan) ---------- */
+function isTagComplete(q) { return !!q.subtopic && DIFFICULTY_LEVELS.includes(q.difficulty); }
+
+function tagBulkRow(q) {
+  const listId = "stl-" + q.id;
+  const dl = el("datalist", { id: listId }, subtopicsOf(q.subject).map(t => el("option", { value: t })));
+  const suggested = q.subtopic ? "" : suggestSubtopic(q.subject, q.text);
+  const sub = el("input", { type: "text", class: "tb-sub", list: listId, value: q.subtopic || "",
+    placeholder: suggested ? `saran: ${suggested}` : "sub-topik (opsional)" });
+  const row = el("div", { class: "tb-row" });
+  function refresh() { row.classList.toggle("tb-done", isTagComplete(q)); }
+  sub.addEventListener("change", () => { q.subtopic = sub.value.trim(); saveStore(); refresh(); });
+
+  let diff = DIFFICULTY_LEVELS.includes(q.difficulty) ? q.difficulty : null;
+  const diffWrap = el("div", { class: "diff-seg tb-diff" }, DIFFICULTY_LEVELS.map(lv =>
+    el("button", { type: "button", class: "diff-btn" + (diff === lv ? " active" : ""), onclick: function () {
+      diff = (diff === lv) ? null : lv; q.difficulty = diff; saveStore();
+      diffWrap.querySelectorAll(".diff-btn").forEach((x, xi) => x.classList.toggle("active", DIFFICULTY_LEVELS[xi] === diff));
+      refresh();
+    } }, `${DIFFICULTY[lv].icon} ${DIFFICULTY[lv].label}`)));
+
+  row.append(
+    el("div", { class: "tb-text" }, truncate(q.text, 110)),
+    el("div", { class: "tb-controls" }, [sub, diffWrap]),
+    dl,
+  );
+  refresh();
+  return row;
+}
+
+function renderTagBulk() {
+  const root = app();
+  root.innerHTML = "";
+  root.appendChild(el("h2", { class: "page-title" }, "Tandai Massal"));
+  root.appendChild(el("button", { class: "btn sm", style: "margin-bottom:12px", onclick: () => go("input") }, "← Kembali ke Input Soal"));
+
+  const all = store.questions;
+  const untagged = all.filter(q => !isTagComplete(q));
+  const done = all.length - untagged.length;
+  root.appendChild(el("div", { class: "note", style: "margin-bottom:14px" },
+    all.length ? `${done} dari ${all.length} soal sudah lengkap (sub-topik + kesulitan). Sisa ${untagged.length}.` : "Belum ada soal."));
+
+  if (!untagged.length) {
+    root.appendChild(emptyState("✅", "Semua soal sudah ditandai",
+      "Sub-topik & tingkat kesulitan lengkap. Heatmap per topik akan terisi seiring kamu & user berlatih.",
+      el("button", { class: "btn primary", onclick: () => go("stats") }, "Lihat Statistik")));
+    return;
+  }
+
+  // Tombol percepat: terapkan saran sub-topik otomatis ke soal yang belum punya sub-topik.
+  const canSuggest = untagged.filter(q => !q.subtopic && suggestSubtopic(q.subject, q.text)).length;
+  if (canSuggest) {
+    root.appendChild(el("div", { class: "btn-row", style: "margin-bottom:14px" }, [
+      el("button", { class: "btn primary", onclick: () => {
+        let n = 0;
+        store.questions.forEach(q => { if (!q.subtopic) { const s = suggestSubtopic(q.subject, q.text); if (s) { q.subtopic = s; n++; } } });
+        saveStore(); toast(`${n} sub-topik terisi dari saran — cek & lengkapi kesulitan`); renderTagBulk();
+      } }, `✨ Terapkan saran sub-topik (${canSuggest})`),
+      el("span", { class: "hint", style: "align-self:center" }, "tetap bisa diubah manual"),
+    ]));
+  }
+
+  // Kelompokkan per mata uji.
+  const bySubject = {};
+  untagged.forEach(q => { const s = q.subject || "Lainnya"; (bySubject[s] = bySubject[s] || []).push(q); });
+  Object.entries(bySubject).forEach(([subject, qs]) => {
+    const card = el("div", { class: "card", style: "margin-bottom:16px" }, [el("h3", { style: "margin-top:0" }, `${subject} · ${qs.length} soal`)]);
+    qs.forEach(q => card.appendChild(tagBulkRow(q)));
+    root.appendChild(card);
+  });
+}
+
 function newPackage() {
   const id = uid();
   store.packages.push({ id, name: `Paket Baru ${store.packages.length + 1}`, mode: "sections", durationMin: 90, sectionMinutes: {}, shuffleQuestions: true, shuffleOptions: true, createdAt: Date.now() });
@@ -1634,8 +1719,8 @@ function questionMateri(q) {
       el("div", { style: "font-size:13px;margin-bottom:6px" },
         [el("span", { class: "materi-ic", style: "font-size:18px;margin-right:6px" }, m.icon),
          el("strong", {}, "Materi terkait: "), q.subject]),
-      el("ul", { class: "materi-list" }, m.topics.map(t => el("li", {}, t.h))),
-      el("button", { class: "btn sm", style: "margin-top:8px", onclick: () => go("materi") }, "📘 Buka materi lengkap →"),
+      el("ul", { class: "materi-list" }, m.topics.map(t => el("li", { class: q.subtopic === t.h ? "materi-li-active" : "" }, t.h))),
+      el("button", { class: "btn sm", style: "margin-top:8px", onclick: () => go("materi", { subject: q.subject, topic: q.subtopic || null }) }, "📘 Buka materi lengkap →"),
     ]));
   }
 
@@ -2344,6 +2429,8 @@ function renderResult(r) {
       });
       if (q.pembahasan) card.appendChild(el("div", { class: "pembahasan" }, [el("strong", {}, "Pembahasan: "), el("span", { html: renderMath(q.pembahasan) })]));
       const sbRes = stepsBlock(q); if (sbRes) card.appendChild(sbRes);
+      // Remediasi saat salah/kosong: tautan ke materi topik soal ini.
+      if (d == null || q.order[d] !== q.answer) { const rem = remediationLink(q); if (rem) card.appendChild(rem); }
       root.appendChild(card);
     });
   });
@@ -2880,6 +2967,8 @@ function renderPracticeSession() {
   }
   if (revealed && q.pembahasan) card.appendChild(el("div", { class: "pembahasan" }, [el("strong", {}, "Pembahasan: "), el("span", { html: renderMath(q.pembahasan) })]));
   if (revealed) { const sbPr = stepsBlock(q, true); if (sbPr) card.appendChild(sbPr); }
+  // Remediasi tepat saat salah/kosong: tautan ke materi topik soal ini.
+  if (revealed && (chosen == null || q.order[chosen] !== q.answer)) { const rem = remediationLink(q); if (rem) card.appendChild(rem); }
 
   const lastQ = i === ps.pool.length - 1;
   if (revealed) {
