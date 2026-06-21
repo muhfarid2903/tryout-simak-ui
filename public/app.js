@@ -682,7 +682,7 @@ function fmtDur(ms) {
 /* ---------- Statistik & latihan: helpers ---------- */
 // Catat hasil pengerjaan satu soal (dipakai tryout & latihan).
 // pickedOrig = indeks opsi ASLI yang dipilih (0-based) untuk analitik distraktor; null bila kosong.
-function recordQStat(qId, outcome, timeMs, pickedOrig) {
+function recordQStat(qId, outcome, timeMs, pickedOrig, conf) {
   if (!qId) return;
   const st = store.qstats[qId] || { seen: 0, correct: 0, wrong: 0, empty: 0, lastResult: null, lastSeen: 0, timeMs: 0 };
   st.seen++;
@@ -690,6 +690,10 @@ function recordQStat(qId, outcome, timeMs, pickedOrig) {
   st.lastResult = outcome;
   st.lastSeen = Date.now();
   st.timeMs += timeMs || 0;
+  // Flag "yakin tapi salah" (high-confidence miss): miskonsepsi paling berbahaya —
+  // ditandai agar diprioritaskan & diberi peringatan saat ditinjau (hypercorrection).
+  if (outcome === "wrong" && conf === "sure") { st.hcFlag = true; st.hcMiss = (st.hcMiss || 0) + 1; }
+  else if (outcome === "correct") { st.hcFlag = false; } // sudah pulih → lepas tanda
   if (pickedOrig != null && pickedOrig >= 0) { // hitung berapa kali tiap opsi dipilih (analitik distraktor)
     if (!Array.isArray(st.picks)) st.picks = [];
     st.picks[pickedOrig] = (st.picks[pickedOrig] || 0) + 1;
@@ -913,11 +917,17 @@ function srsPriority(qId) {
   const days = (Date.now() - st.lastSeen) / 86400000;
   p += Math.min(25, days * 3);
   if (st.correct >= 2 && st.lastResult === "correct" && st.wrong === 0) p -= 30; // sudah dikuasai
+  if (st.hcFlag) p += 35; // "yakin tapi salah" → dahulukan untuk koreksi
   if (st.due != null) { // dahulukan yang sudah jatuh tempo, tunda yang belum
     const overdue = (Date.now() - st.due) / SRS_DAY;
     p += overdue >= 0 ? Math.min(40, 20 + overdue * 4) : Math.max(-40, overdue * 4);
   }
   return p;
+}
+// Soal "yakin tapi salah" yang belum dipulihkan (untuk drill khusus & badge).
+function hcMissQuestionIds() {
+  return store.questions.filter(q => { const st = store.qstats[q.id]; return st && st.hcFlag; })
+    .map(q => q.id).sort((a, b) => srsPriority(b) - srsPriority(a));
 }
 // Soal yang masih sering salah / belum dikuasai.
 function weakQuestionIds() {
@@ -2474,6 +2484,7 @@ function journalBody(root) {
     const card = el("div", { class: "card", style: "margin-bottom:14px" }, [
       el("div", { class: "q-meta", style: "display:flex;align-items:center;gap:8px;flex-wrap:wrap" }, [
         q.subject ? el("span", { class: "tag" }, q.subject) : null,
+        st.hcFlag ? el("span", { class: "chip hc-chip" }, "⚠️ Yakin tapi salah") : null,
         isLeech(id) ? el("span", { class: "chip yellow" }, "🧯 Sering salah") : null,
         el("span", {}, `❌ ${st.wrong || 0}× · ✅ ${st.correct || 0}×`),
       ]),
@@ -2838,9 +2849,11 @@ function renderPractice() {
   const dueN = dueQuestionIds().length;
   const newN = newQuestionIds().length;
   const leechN = leechQuestionIds().length;
+  const hcN = hcMissQuestionIds().length;
   const grid = el("div", { class: "grid" }, [
     practiceCard("⚡", "Review 5 menit", "sesi kilat · 7 soal prioritas", false, () => startPractice("micro", { title: "Review 5 menit" })),
     practiceCard("📅", "Review hari ini", dueN ? `${dueN} soal jatuh tempo` : "tidak ada yang jatuh tempo", dueN === 0, () => startPractice("due", { title: "Review hari ini" })),
+    hcN ? practiceCard("⚠️", "Yakin tapi salah", `${hcN} soal · kamu yakin tapi keliru — paling penting dikoreksi`, false, () => startPractice("hcmiss", { title: "Yakin tapi salah" })) : null,
     practiceCard("🎯", "Soal yang salah", `${wrongN} soal perlu diulang`, wrongN === 0, () => startPractice("wrong", { title: "Soal yang salah" })),
     leechN ? practiceCard("🧯", "Soal bandel", `${leechN} soal sering salah · baca materi`, false, () => startPractice("leech", { title: "Soal bandel" })) : null,
     practiceCard("★", "Soal ditandai", `${bmN} soal di-bookmark`, bmN === 0, () => startPractice("bookmark", { title: "Soal ditandai" })),
@@ -2866,6 +2879,7 @@ function startPractice(mode, opts = {}) {
   else if (mode === "due") ids = dueQuestionIds();
   else if (mode === "new") ids = newQuestionIds();
   else if (mode === "leech") ids = leechQuestionIds();
+  else if (mode === "hcmiss") ids = hcMissQuestionIds();
   else if (mode === "micro") {
     // Sesi kilat: gabungan jatuh tempo + bandel + terlemah; bila kurang, lengkapi soal baru.
     const set = new Set([...dueQuestionIds(), ...leechQuestionIds(), ...weakQuestionIds()]);
@@ -2886,6 +2900,7 @@ function startPractice(mode, opts = {}) {
       : mode === "due" ? "Tidak ada soal jatuh tempo hari ini 🎉"
       : mode === "new" ? "Semua soal sudah pernah kamu coba 👍"
       : mode === "leech" ? "Tidak ada soal bandel — kerja bagus! 🎉"
+      : mode === "hcmiss" ? "Tak ada soal 'yakin tapi salah' — kalibrasimu bagus! 🎯"
       : mode === "micro" ? "Belum ada soal untuk direview. Coba kerjakan beberapa soal dulu 👍"
       : mode === "weakness" ? "Kerjakan beberapa soal dulu — kelemahanmu akan terdeteksi otomatis 👍"
       : mode === "subtopic" ? "Belum ada soal untuk topik ini"
@@ -3012,7 +3027,7 @@ function finalizeAnswer(displayIdx, conf) {
   ps.answers[i] = displayIdx; ps.revealed[i] = true; ps.confidence[i] = conf; ps.times[i] = timeMs;
   const ok = q.order[displayIdx] === q.answer;
   if (ok) ps.correct++; else ps.wrong++;
-  recordQStat(q.id, ok ? "correct" : "wrong", timeMs, q.order[displayIdx]);
+  recordQStat(q.id, ok ? "correct" : "wrong", timeMs, q.order[displayIdx], conf);
   if (conf) recordCalibration(conf, ok);
   saveStore();
   renderPracticeSession();
