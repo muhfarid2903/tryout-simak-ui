@@ -458,6 +458,7 @@ function normalizeStore(s) {
   s.daily = s.daily || {};            // jumlah soal dijawab per hari: { "YYYY-M-D": n } (untuk target harian)
   s.dailyMs = s.dailyMs || {};        // total waktu belajar per hari (ms): untuk target harian berbasis menit
   s.qnotes = s.qnotes || {};          // catatan refleksi per soal (jurnal kesalahan): { qId: teks }
+  s.reports = s.reports || {};        // soal dilaporkan user untuk QA admin: { qId: { reason, ts } }
   s.settings = s.settings || {};
   if (s.settings.calibrate == null) s.settings.calibrate = true; // mode rating keyakinan
   if (s.settings.dailyGoal == null) s.settings.dailyGoal = 20;   // target soal per hari
@@ -2032,6 +2033,42 @@ function optNoteEl(q, origIdx, isCorrect) {
   if (!note || !String(note).trim()) return null;
   return el("div", { class: "opt-note " + (isCorrect ? "correct" : "wrong"), html: renderMath(note) });
 }
+// "Jebakan langgananmu" (QW2): opsi SALAH yang paling sering kamu pilih di soal ini (≥2×).
+// Pakai picks[] yang sudah terekam + optExplain. Dirujuk lewat ISI opsi, bukan huruf,
+// karena urutan pilihan diacak tiap tampil. Menyasar miskonsepsi yang berulang.
+function recurringTrapBlock(q) {
+  const st = store.qstats[q.id];
+  if (!st || !Array.isArray(st.picks)) return null;
+  let trapIdx = -1, trapN = 0;
+  st.picks.forEach((c, k) => { if (k !== q.answer && (c || 0) > trapN) { trapN = c || 0; trapIdx = k; } });
+  if (trapIdx < 0 || trapN < 2) return null;
+  const why = q.optExplain && q.optExplain[trapIdx] && String(q.optExplain[trapIdx]).trim();
+  const box = el("div", { class: "trap-block" }, [
+    el("div", { class: "trap-head" }, [
+      el("strong", {}, `⚠️ Jebakan langgananmu (${trapN}×): `),
+      el("span", { html: renderMath(q.options[trapIdx]) }),
+    ]),
+  ]);
+  box.appendChild(el("div", { class: "trap-why", html: why ? renderMath(why)
+    : "Kamu berulang kali tergoda pilihan ini — cermati apa yang membedakannya dari kunci sebelum menjawab." }));
+  return box;
+}
+// Self-explanation (QW1): minta user menjelaskan ulang dengan kata-katanya sendiri kenapa
+// kuncinya benar. Muncul saat salah/kosong — momen paling produktif untuk koreksi miskonsepsi.
+// Tersimpan ke store.qnotes (sama dengan Jurnal Kesalahan), jadi tak menambah model data baru.
+function selfExplainBlock(q) {
+  const wrap = el("div", { class: "self-explain" }, [
+    el("div", { class: "se-label" }, "✍️ Jelaskan dengan bahasamu sendiri: kenapa kuncinya benar?"),
+  ]);
+  const ta = el("textarea", { rows: "2", placeholder: "Menjelaskan ulang pakai kalimatmu sendiri membuat ingatannya jauh lebih melekat…", style: "width:100%" }, store.qnotes[q.id] || "");
+  ta.addEventListener("change", () => {
+    const v = ta.value.trim();
+    if (v) store.qnotes[q.id] = v; else delete store.qnotes[q.id];
+    saveStore(); toast("Tersimpan di Jurnal Kesalahan");
+  });
+  wrap.appendChild(ta);
+  return wrap;
+}
 
 function buildSections(pkg, qs) {
   if (pkg.mode === "sections") {
@@ -2076,6 +2113,34 @@ function accrueTime() {
 }
 function stopTimer() { if (examTimer) { clearInterval(examTimer); examTimer = null; } }
 
+// Pacing tracker (QW3): bandingkan jumlah soal terjawab dengan "pace merata" berdasarkan
+// waktu sesi yang sudah berjalan. Manajemen waktu = nyawa TPA SIMAK (banyak soal, waktu ketat).
+function paceInfo() {
+  const sec = curSec();
+  const totalMs = sec.minutes * 60000;
+  const remain = Math.max(0, (sec.endsAt || Date.now()) - Date.now());
+  const elapsed = Math.max(0, totalMs - remain);
+  const n = sec.questions.length;
+  const answered = sec.answers.filter(a => a !== null).length;
+  const left = n - answered;
+  if (left <= 0) return { text: `⏱ Semua ${n} soal terjawab — sisa ${fmtTime(remain)} untuk memeriksa ulang.`, tone: "ahead" };
+  const perLeft = remain / left;                       // sisa waktu per soal yang belum dijawab
+  const expected = totalMs > 0 ? (elapsed / totalMs) * n : 0; // "seharusnya" sudah dijawab segini
+  const diff = answered - expected;
+  const tone = diff <= -1.5 ? "behind" : diff >= 0.8 ? "ahead" : "on";
+  const status = tone === "behind" ? "Tertinggal — percepat sedikit"
+    : tone === "ahead" ? "Di depan jadwal — tetap teliti"
+    : "Sesuai pace";
+  return { text: `⏱ ${status} · ~${fmtDur(perLeft)}/soal untuk ${left} soal tersisa`, tone };
+}
+function paintPace() {
+  const pace = document.getElementById("paceText");
+  if (!pace || !examState) return;
+  const info = paceInfo();
+  pace.textContent = info.text;
+  pace.className = "q-meta pace-" + info.tone;
+}
+
 function startTimer() {
   stopTimer();
   const tick = () => {
@@ -2085,6 +2150,7 @@ function startTimer() {
     t.textContent = fmtTime(remain);
     t.classList.toggle("warn", remain <= 300000 && remain > 60000);
     t.classList.toggle("danger", remain <= 60000);
+    paintPace();
     if (remain <= 0) { stopTimer(); onSectionTimeout(); }
   };
   tick();
@@ -2116,6 +2182,7 @@ function renderExam() {
   const titleBits = [el("h2", { class: "page-title", style: "margin:0" }, s.pkgName)];
   if (isSections) titleBits.push(el("div", { class: "q-meta" }, `Mata Uji: ${sec.subject} · Sesi ${s.si + 1} dari ${s.sections.length}`));
   titleBits.push(el("div", { class: "q-meta", id: "progressText" }, ""));
+  titleBits.push(el("div", { class: "q-meta pace-on", id: "paceText" }, "")); // QW3: indikator pace
 
   root.appendChild(el("div", { class: "exam-header" }, [
     el("div", {}, titleBits),
@@ -2219,6 +2286,7 @@ function updateProgress() {
   if (!p) return;
   const sec = curSec();
   p.textContent = `Terjawab ${sec.answers.filter(a => a !== null).length}/${sec.questions.length}`;
+  paintPace(); // QW3: refresh pace seketika saat jawaban berubah
 }
 
 function confirmFinishSection() {
@@ -2421,7 +2489,7 @@ function renderResult(r) {
         star.textContent = on ? "★ Ditandai" : "☆ Tandai";
       });
       const card = el("div", { class: "card review-q" }, [
-        el("div", { class: "q-meta", style: "display:flex;align-items:center;gap:8px" }, [el("strong", {}, `Soal ${no}`), status, el("span", { style: "flex:1" }), star]),
+        el("div", { class: "q-meta", style: "display:flex;align-items:center;gap:8px" }, [el("strong", {}, `Soal ${no}`), status, el("span", { style: "flex:1" }), star, reportBtn(q.id)]),
         mathText("div", "q-text", q.text),
         q.image ? el("img", { class: "q-img", src: q.image, onerror: function () { this.style.display = "none"; } }) : null,
       ]);
@@ -2437,6 +2505,7 @@ function renderResult(r) {
         ]));
         const note = optNoteEl(q, origIdx, isCorrect); if (note) card.appendChild(note);
       });
+      const trap = recurringTrapBlock(q); if (trap) card.appendChild(trap); // QW2: jebakan langganan
       if (q.pembahasan) card.appendChild(el("div", { class: "pembahasan" }, [el("strong", {}, "Pembahasan: "), el("span", { html: renderMath(q.pembahasan) })]));
       const sbRes = stepsBlock(q); if (sbRes) card.appendChild(sbRes);
       // Remediasi saat salah/kosong: tautan ke materi topik soal ini.
@@ -2805,6 +2874,36 @@ function bookmarkBtn(qId) {
   b.addEventListener("click", () => { const on = toggleBookmark(qId); b.classList.toggle("on", on); b.textContent = on ? "★ Ditandai" : "☆ Tandai"; });
   return b;
 }
+// "Lapor soal" (QW5): user menandai soal yang keliru/ambigu → tersimpan di store.reports
+// (ikut tersinkron lewat progressData) → admin melihat antrian QA di halaman Hasil Ujian.
+function isReported(qId) { return !!(store.reports && store.reports[qId]); }
+const REPORT_REASONS = ["Salah kunci jawaban", "Soal ambigu / >1 jawaban benar", "Salah ketik / format rusak", "Lainnya"];
+function reportBtn(qId) {
+  const b = el("button", { class: "report-btn" + (isReported(qId) ? " on" : ""), title: "Laporkan jika soal ini keliru atau ambigu" },
+    isReported(qId) ? "🚩 Dilaporkan" : "⚐ Lapor");
+  const paint = () => { b.classList.toggle("on", isReported(qId)); b.textContent = isReported(qId) ? "🚩 Dilaporkan" : "⚐ Lapor"; };
+  b.addEventListener("click", () => {
+    if (isReported(qId)) { delete store.reports[qId]; saveStore(); paint(); toast("Laporan dibatalkan"); }
+    else openReportModal(qId, paint);
+  });
+  return b;
+}
+function openReportModal(qId, onDone) {
+  const overlay = el("div", { class: "modal-overlay" });
+  const close = () => overlay.remove();
+  const box = el("div", { class: "modal" }, [
+    el("h3", {}, "Laporkan soal"),
+    el("p", { class: "q-meta", style: "margin-top:0" }, "Apa yang keliru? Laporanmu membantu admin memperbaiki bank soal."),
+  ]);
+  REPORT_REASONS.forEach(r => box.appendChild(el("button", { class: "btn", style: "width:100%;margin-top:8px;justify-content:flex-start", onclick: () => {
+    store.reports[qId] = { reason: r, ts: Date.now() }; saveStore(); close();
+    if (onDone) onDone(); toast("Terima kasih — soal dilaporkan ke admin");
+  } }, r)));
+  box.appendChild(el("div", { class: "btn-row", style: "justify-content:flex-end;margin-top:14px" }, [el("button", { class: "btn sm", onclick: close }, "Batal")]));
+  overlay.appendChild(box);
+  overlay.addEventListener("click", e => { if (e.target === overlay) close(); });
+  document.body.appendChild(overlay);
+}
 function practiceCard(icon, title, sub, disabled, onstart) {
   return el("div", { class: "card pkg-card" }, [
     el("h3", { style: "margin:0 0 4px" }, title),
@@ -2850,6 +2949,7 @@ function renderPractice() {
   const newN = newQuestionIds().length;
   const leechN = leechQuestionIds().length;
   const hcN = hcMissQuestionIds().length;
+  const taggedN = store.questions.filter(q => DIFFICULTY_LEVELS.includes(q.difficulty)).length;
   const grid = el("div", { class: "grid" }, [
     practiceCard("⚡", "Review 5 menit", "sesi kilat · 7 soal prioritas", false, () => startPractice("micro", { title: "Review 5 menit" })),
     practiceCard("📅", "Review hari ini", dueN ? `${dueN} soal jatuh tempo` : "tidak ada yang jatuh tempo", dueN === 0, () => startPractice("due", { title: "Review hari ini" })),
@@ -2858,6 +2958,7 @@ function renderPractice() {
     leechN ? practiceCard("🧯", "Soal bandel", `${leechN} soal sering salah · baca materi`, false, () => startPractice("leech", { title: "Soal bandel" })) : null,
     practiceCard("★", "Soal ditandai", `${bmN} soal di-bookmark`, bmN === 0, () => startPractice("bookmark", { title: "Soal ditandai" })),
     practiceCard("🔀", "Campur cerdas", `${store.questions.length} soal · prioritas SRS`, false, () => startPractice("mix", { title: "Campur cerdas" })),
+    taggedN >= 4 ? practiceCard("🪜", "Tangga kesulitan", "mudah → sulit, menyesuaikan jawabanmu", false, () => startPractice("ladder", { title: "Tangga kesulitan" })) : null,
     practiceCard("✨", "Soal baru", newN ? `${newN} soal belum dicoba` : "semua sudah dicoba", newN === 0, () => startPractice("new", { title: "Soal baru" })),
   ]);
   root.appendChild(grid);
@@ -2871,7 +2972,67 @@ function renderPractice() {
   });
   root.appendChild(sg);
 }
+
+/* ---------- Tangga kesulitan (QW4): latihan adaptif berbasis level kesulitan ----------
+   Mulai dari mudah (warm-up & bangun rasa mampu), naik level setelah 2 benar beruntun,
+   turun saat salah → setiap orang berlatih di zona proksimalnya (desirable difficulty).
+   Pool tumbuh dinamis: soal berikutnya baru dipilih saat dibutuhkan, sesuai level terkini. */
+const LADDER_TARGET = 15;
+function ladderPickNext() {
+  // Sajikan soal dari bucket terdekat dengan level-target saat ini. Level-target TIDAK diubah
+  // di sini (hanya performa yang menggesernya) — agar habisnya stok satu level tak menyeret
+  // target naik/turun secara keliru. Bila level pas kosong, ambil yang terdekat (lebih mudah dulu).
+  const L = practiceState.ladder;
+  const order = [L.level, L.level - 1, L.level + 1, L.level - 2, L.level + 2];
+  for (const v of order) {
+    if (v >= 1 && v <= 3 && L.buckets[v] && L.buckets[v].length) return L.buckets[v].shift();
+  }
+  return null;
+}
+function ladderAppend(q) {
+  const ps = practiceState;
+  ps.pool.push(prepareQuestion(q, true));
+  ps.answers.push(null); ps.revealed.push(false); ps.pending.push(null);
+  ps.confidence.push(null); ps.times.push(0);
+}
+function ladderAdjust(ok) {
+  const L = practiceState.ladder;
+  if (ok) { L.streak = (L.streak > 0 ? L.streak : 0) + 1; if (L.streak >= 2 && L.level < 3) { L.level++; L.streak = 0; } }
+  else { L.streak = 0; if (L.level > 1) L.level--; }
+}
+function startLadder(opts) {
+  const inScope = q => !opts.subject || (q.subject || "Lainnya") === opts.subject;
+  const buckets = { 1: [], 2: [], 3: [] };
+  store.questions.forEach(q => { if (inScope(q) && DIFFICULTY_LEVELS.includes(q.difficulty)) buckets[q.difficulty].push(q); });
+  const totalTagged = buckets[1].length + buckets[2].length + buckets[3].length;
+  if (totalTagged < 4) { toast("Belum cukup soal ber-level untuk mode tangga — tandai kesulitan soal dulu."); return; }
+  DIFFICULTY_LEVELS.forEach(v => buckets[v].sort((a, b) => srsPriority(b.id) - srsPriority(a.id))); // lemah/baru dulu
+  const startLevel = buckets[1].length ? 1 : (buckets[2].length ? 2 : 3);
+  practiceState = {
+    mode: "ladder", subject: opts.subject || null, title: opts.title || "Tangga kesulitan",
+    pool: [], idx: 0, answers: [], revealed: [], correct: 0, wrong: 0,
+    startedAt: Date.now(), qStart: 0, calibrate: store.settings.calibrate !== false,
+    pending: [], confidence: [], times: [],
+    ladder: { buckets, level: startLevel, streak: 0, target: Math.min(totalTagged, LADDER_TARGET) },
+  };
+  const first = ladderPickNext();
+  if (!first) { practiceState = null; toast("Belum ada soal untuk mode tangga"); return; }
+  ladderAppend(first);
+  go("practice");
+}
+// Total soal yang ditargetkan & deteksi akhir sesi — beda untuk ladder (pool tumbuh dinamis).
+function practiceTotal() { const ps = practiceState; return ps.ladder ? ps.ladder.target : ps.pool.length; }
+function practiceAtEnd() {
+  const ps = practiceState;
+  if (ps.ladder) {
+    if (ps.pool.length >= ps.ladder.target) return true;
+    return !DIFFICULTY_LEVELS.some(v => ps.ladder.buckets[v].length); // tak ada sisa soal di bucket
+  }
+  return ps.idx === ps.pool.length - 1;
+}
+
 function startPractice(mode, opts = {}) {
+  if (mode === "ladder") { startLadder(opts); return; }
   const byId = {}; store.questions.forEach(q => byId[q.id] = q);
   let ids;
   if (mode === "wrong") ids = weakQuestionIds();
@@ -2934,18 +3095,19 @@ function renderPracticeSession() {
   root.appendChild(el("div", { class: "exam-header" }, [
     el("div", {}, [
       el("h2", { class: "page-title", style: "margin:0" }, ps.title),
-      el("div", { class: "q-meta" }, `Soal ${i + 1} dari ${ps.pool.length} · ✅ ${ps.correct} · ❌ ${ps.wrong}`),
+      el("div", { class: "q-meta" }, `Soal ${i + 1} dari ${practiceTotal()} · ✅ ${ps.correct} · ❌ ${ps.wrong}`
+        + (ps.ladder && DIFFICULTY[q.difficulty] ? ` · ${DIFFICULTY[q.difficulty].icon} ${DIFFICULTY[q.difficulty].label}` : "")),
     ]),
     el("button", { class: "btn sm", onclick: () => finishPractice() }, "Akhiri"),
   ]));
-  root.appendChild(el("div", { class: "meter", style: "margin-bottom:14px" }, [el("div", { class: "meter-fill good", style: `width:${Math.round((answeredCount / ps.pool.length) * 100)}%` })]));
+  root.appendChild(el("div", { class: "meter", style: "margin-bottom:14px" }, [el("div", { class: "meter-fill good", style: `width:${Math.round((answeredCount / Math.max(1, practiceTotal())) * 100)}%` })]));
 
   const revealed = ps.revealed[i], chosen = ps.answers[i], pending = ps.pending[i];
   const card = el("div", { class: "card", id: "practiceMain" }, [
     el("div", { class: "q-meta", style: "display:flex;align-items:center;gap:8px;flex-wrap:wrap" }, [
       q.subject ? el("span", { class: "tag" }, q.subject) : null,
       isLeech(q.id) ? el("span", { class: "chip yellow", title: "Soal ini sering kamu jawab salah — baca materinya, jangan cuma diulang." }, "🧯 Sering salah") : null,
-      el("span", { style: "flex:1" }), bookmarkBtn(q.id),
+      el("span", { style: "flex:1" }), bookmarkBtn(q.id), reportBtn(q.id),
     ]),
     mathText("div", "q-text", q.text),
     q.image ? el("img", { class: "q-img", src: q.image, alt: "gambar soal", onerror: function () { this.style.display = "none"; } }) : null,
@@ -2980,12 +3142,16 @@ function renderPracticeSession() {
     const sh = speedHint(q, ps.times[i]);
     if (sh) card.appendChild(el("div", { class: "q-meta", style: "margin-top:8px" }, sh));
   }
+  // "Jebakan langgananmu" (QW2): soroti opsi salah yang berulang kali kamu pilih.
+  if (revealed) { const trap = recurringTrapBlock(q); if (trap) card.appendChild(trap); }
   if (revealed && q.pembahasan) card.appendChild(el("div", { class: "pembahasan" }, [el("strong", {}, "Pembahasan: "), el("span", { html: renderMath(q.pembahasan) })]));
   if (revealed) { const sbPr = stepsBlock(q, true); if (sbPr) card.appendChild(sbPr); }
   // Remediasi tepat saat salah/kosong: tautan ke materi topik soal ini.
   if (revealed && (chosen == null || q.order[chosen] !== q.answer)) { const rem = remediationLink(q); if (rem) card.appendChild(rem); }
+  // Self-explanation (QW1): hanya saat salah/kosong — momen paling produktif untuk koreksi.
+  if (revealed && (chosen == null || q.order[chosen] !== q.answer)) card.appendChild(selfExplainBlock(q));
 
-  const lastQ = i === ps.pool.length - 1;
+  const lastQ = practiceAtEnd();
   if (revealed) {
     card.appendChild(el("div", { class: "btn-row", style: "margin-top:18px" }, [
       el("span", { style: "flex:1" }),
@@ -3027,6 +3193,7 @@ function finalizeAnswer(displayIdx, conf) {
   ps.answers[i] = displayIdx; ps.revealed[i] = true; ps.confidence[i] = conf; ps.times[i] = timeMs;
   const ok = q.order[displayIdx] === q.answer;
   if (ok) ps.correct++; else ps.wrong++;
+  if (ps.ladder) ladderAdjust(ok); // QW4: naik level bila 2 benar beruntun, turun bila salah
   recordQStat(q.id, ok ? "correct" : "wrong", timeMs, q.order[displayIdx], conf);
   if (conf) recordCalibration(conf, ok);
   saveStore();
@@ -3036,12 +3203,20 @@ function skipPractice() {
   const ps = practiceState, i = ps.idx, q = ps.pool[i];
   if (ps.revealed[i]) return;
   ps.revealed[i] = true; ps.pending[i] = null;
+  if (ps.ladder) ps.ladder.streak = 0; // QW4: melewati soal mereset streak naik-level
   recordQStat(q.id, "empty", Date.now() - (ps.qStart || Date.now()));
   saveStore();
   renderPracticeSession();
 }
 function nextPractice() {
-  practiceState.idx++; practiceState.qStart = Date.now();
+  const ps = practiceState;
+  if (ps.ladder) { // QW4: pilih & sambung soal berikutnya sesuai level terkini
+    if (practiceAtEnd()) { finishPractice(); return; }
+    const q = ladderPickNext();
+    if (!q) { finishPractice(); return; }
+    ladderAppend(q);
+  }
+  ps.idx++; ps.qStart = Date.now();
   renderPracticeSession();
 }
 function finishPractice() {
@@ -3126,7 +3301,7 @@ function handlePracticeKey(e) {
     if (optIdx >= 0 && optIdx < q.order.length) { e.preventDefault(); answerPractice(optIdx); }
   } else if (e.key === "Enter" || e.key === "ArrowRight" || key === " ") {
     e.preventDefault();
-    i >= ps.pool.length - 1 ? finishPractice() : nextPractice();
+    practiceAtEnd() ? finishPractice() : nextPractice();
   }
 }
 
@@ -3207,7 +3382,7 @@ function progressData() {
     records: store.records || {}, achievements: store.achievements || {},
     qstats: store.qstats || {}, bookmarks: store.bookmarks || {}, practiceLog: store.practiceLog || [],
     calib: store.calib || {}, settings: store.settings || {}, daily: store.daily || {},
-    dailyMs: store.dailyMs || {}, qnotes: store.qnotes || {},
+    dailyMs: store.dailyMs || {}, qnotes: store.qnotes || {}, reports: store.reports || {},
   };
 }
 function applyContent(data) {
@@ -3225,6 +3400,7 @@ function applyProgress(data, updatedAt) {
   store.daily = data.daily || {};
   store.dailyMs = data.dailyMs || {};
   store.qnotes = data.qnotes || {};
+  store.reports = data.reports || {};
   if (data.calib) store.calib = data.calib;
   if (data.settings) store.settings = data.settings;
   store._updatedAt = updatedAt || 0;
@@ -3445,6 +3621,34 @@ async function renderAdminResults() {
     el("div", { class: "stat-card" }, [el("div", { class: "sc-ic" }, "✅"), el("div", {}, [el("div", { class: "sc-val" }, String(activeUsers)), el("div", { class: "sc-lbl" }, "Pernah tryout")])]),
     el("div", { class: "stat-card" }, [el("div", { class: "sc-ic" }, "📝"), el("div", {}, [el("div", { class: "sc-val" }, String(totalAttempts)), el("div", { class: "sc-lbl" }, "Total percobaan")])]),
   ]));
+
+  // QW5: antrian QA — soal yang dilaporkan user. Teks soal diambil dari konten lokal admin.
+  const reports = out.reports || {};
+  const repIds = Object.keys(reports);
+  if (repIds.length) {
+    const qById = {}; (store.questions || []).forEach((q) => { qById[q.id] = q; });
+    const card = el("div", { class: "card", style: "margin-bottom:18px;border-color:var(--ui-yellow-dark)" }, [
+      el("h3", { style: "margin-top:0" }, `🚩 Soal Dilaporkan (${repIds.length})`),
+      el("p", { class: "q-meta", style: "margin-top:0" }, "Ditandai user sebagai keliru/ambigu. Periksa & perbaiki — laporan hilang setelah user mencabutnya."),
+    ]);
+    repIds.sort((a, b) => reports[b].length - reports[a].length).forEach((qId) => {
+      const list = reports[qId], q = qById[qId];
+      const reasons = [...new Set(list.map((x) => x.reason).filter(Boolean))];
+      card.appendChild(el("div", { class: "card", style: "margin:10px 0;padding:12px" }, [
+        el("div", { class: "q-meta", style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, [
+          el("span", { class: "chip yellow" }, `${list.length} laporan`),
+          q && q.subject ? el("span", { class: "tag" }, q.subject) : null,
+          el("span", { style: "flex:1" }),
+          q ? el("button", { class: "btn sm primary", onclick: () => { currentView = "input"; setNav("input"); openEditForm(q.packageId, q.id); } }, "✏️ Perbaiki")
+            : el("span", { class: "q-meta" }, "(soal tak ada di kontenmu)"),
+        ]),
+        q ? mathText("div", "q-text", q.text) : el("div", { class: "q-meta" }, "ID: " + qId),
+        q ? el("div", { class: "pembahasan" }, [el("strong", {}, "Kunci: "), el("span", { html: renderMath(q.options[q.answer]) })]) : null,
+        el("div", { class: "q-meta", style: "margin-top:6px" }, "Alasan: " + (reasons.join("; ") || "—")),
+      ]));
+    });
+    root.appendChild(card);
+  }
 
   const search = el("input", { type: "text", placeholder: "Cari email user…", style: "max-width:340px;margin:4px 0 20px" });
   root.appendChild(search);

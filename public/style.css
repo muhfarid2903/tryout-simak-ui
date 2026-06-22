@@ -806,3 +806,22 @@ body.auth-screen main { max-width: none; margin: 0; padding: 0; }
 .remediation .rem-ic { font-size: 17px; }
 .remediation .rem-txt { flex: 1; min-width: 140px; font-size: 13px; font-weight: 600; color: var(--warm-ink); }
 .materi-li-active { font-weight: 700; color: var(--warm-ink); }
+
+/* QW1 — Self-explanation (menjelaskan ulang dengan kata sendiri) */
+.self-explain { margin-top: 12px; padding: 10px 12px; background: var(--surface-soft); border-radius: 8px; }
+.self-explain .se-label { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+
+/* QW2 — "Jebakan langgananmu" (opsi salah yang berulang dipilih) */
+.trap-block { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--red-bg); border-left: 4px solid var(--red); font-size: 13.5px; }
+.trap-block .trap-head { margin-bottom: 4px; }
+.trap-block .trap-why { color: var(--ui-ink-soft); white-space: pre-wrap; }
+
+/* QW3 — Pacing tracker di mode ujian */
+.pace-ahead { color: var(--green); font-weight: 600; }
+.pace-on { color: var(--ui-ink-soft); }
+.pace-behind { color: var(--red); font-weight: 700; }
+
+/* QW5 — Tombol "Lapor soal" */
+.report-btn { background: transparent; border: 1px solid var(--border); color: var(--ui-ink-soft); border-radius: 8px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; flex: none; }
+.report-btn:hover { border-color: var(--red); color: var(--red); }
+.report-btn.on { background: var(--red-bg); border-color: var(--red); color: var(--red); font-weight: 700; }
