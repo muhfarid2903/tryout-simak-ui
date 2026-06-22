@@ -206,7 +206,17 @@ app.get("/api/admin/results", requireDb, auth, adminOnly, async (_req, res) => {
       updatedAt: Number(r.updated_at) || 0,
       records: (r.data && r.data.records) || {},
     }));
-    res.json({ packages, users });
+    // Antrian QA: soal yang dilaporkan user sebagai keliru/ambigu (lapor soal).
+    const reports = {};
+    rows.forEach((r) => {
+      const rep = r.data && r.data.reports;
+      if (!rep || typeof rep !== "object") return;
+      for (const [qId, v] of Object.entries(rep)) {
+        if (!v) continue;
+        (reports[qId] = reports[qId] || []).push({ email: r.email, reason: (v && v.reason) || "", ts: Number(v && v.ts) || 0 });
+      }
+    });
+    res.json({ packages, users, reports });
   } catch (e) { console.error(e); res.status(500).json({ error: "Gagal memuat hasil ujian" }); }
 });
 
