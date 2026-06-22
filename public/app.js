@@ -1302,6 +1302,19 @@ function renderHome() {
     ]));
   }
 
+  // Pelatih: pointer ke Rencana Hari Ini (PR1) — muncul bila sudah ada data latihan.
+  if (store.questions.length && Object.values(store.qstats).reduce((a, s) => a + (s.seen || 0), 0) > 0) {
+    const nActs = coachActions().length;
+    root.appendChild(el("div", { class: "focus-banner", style: "margin-bottom:14px" }, [
+      el("span", { class: "rb-icon" }, "🧭"),
+      el("div", { style: "flex:1" }, [
+        el("strong", {}, "Rencana dari pelatihmu"),
+        el("div", { style: "font-size:13px" }, nActs ? `${nActs} langkah disiapkan untuk hari ini.` : "Buka untuk melihat langkah berikutnya."),
+      ]),
+      el("button", { class: "btn sm primary", onclick: () => go("stats") }, "Buka rencana"),
+    ]));
+  }
+
   // Sesi kilat untuk pengguna sibuk: 7 soal prioritas (jatuh tempo + bandel + terlemah).
   if (store.questions.length) {
     root.appendChild(el("div", { class: "focus-banner", style: "margin-bottom:14px" }, [
@@ -2679,6 +2692,98 @@ function focusRecommendation() {
   const gain = Math.round(share * (80 - weakest.accuracy)); // perkiraan poin % naik
   return { subject: weakest.subject, accuracy: weakest.accuracy, gain };
 }
+/* ---------- Pelatih Belajar (PR1): Statistik sebagai pelatih, bukan papan angka ----------
+   Rakit "Rencana Hari Ini" dari sinyal yang sudah ada — terprioritaskan, diberi ALASAN,
+   dibatasi anggaran menit harian. Mengurangi beban memilih (self-regulated learning) &
+   memaksa retrieval + spacing tepat waktu. Tanpa data/skema baru. */
+function avgMinPerQ() {
+  let t = 0, n = 0;
+  Object.values(store.qstats).forEach(s => { if (s.seen) { t += s.timeMs || 0; n += s.seen; } });
+  return Math.max(0.5, (n ? t / n : 60000) / 60000);
+}
+function coachActions() {
+  const out = [], mpq = avgMinPerQ();
+  const estMin = n => Math.max(1, Math.round(Math.min(n, 25) * mpq));
+  const sumSeen = Object.values(store.qstats).reduce((a, s) => a + (s.seen || 0), 0);
+
+  if (sumSeen === 0) { // cold start → arahkan ke titik mulai
+    if (store.questions.length >= 8 && !store.settings.diagnosticDoneAt)
+      out.push({ icon: "📋", title: "Tes Diagnostik", reason: "Belum ada data — mulai dari sini agar pelatih tahu kelemahanmu.", minutes: 15, run: () => startPractice("diagnostic", { title: "Tes Diagnostik" }) });
+    else
+      out.push({ icon: "✨", title: "Coba soal baru", reason: "Kerjakan beberapa soal dulu agar pelatih bisa menyusun rencana.", minutes: estMin(10), run: () => startPractice("new", { title: "Soal baru" }) });
+    return out;
+  }
+
+  const cand = [];
+  const hcN = hcMissQuestionIds().length;
+  if (hcN) cand.push({ p: 100, icon: "⚠️", title: `Perbaiki "yakin tapi salah" (${hcN})`, reason: "Miskonsepsi paling berbahaya — kamu yakin tapi keliru. Paling tinggi nilainya untuk dikoreksi.", minutes: estMin(hcN), run: () => startPractice("hcmiss", { title: "Yakin tapi salah" }) });
+
+  const dueN = dueQuestionIds().length;
+  if (dueN) cand.push({ p: 80 + Math.min(15, dueN), icon: "📅", title: `Review jatuh tempo (${dueN})`, reason: "Diulang tepat saat hampir lupa — inti spaced repetition. Menunda = retensi turun.", minutes: estMin(dueN), run: () => startPractice("due", { title: "Review hari ini" }) });
+
+  const foc = focusRecommendation();
+  if (foc && foc.gain >= 1) cand.push({ p: 70 + Math.min(20, foc.gain * 2), icon: "🎯", title: `Naikkan ${foc.subject}`, reason: `Ungkit skor terbesar: akurasi ${foc.accuracy}% · estimasi +${foc.gain} poin bila diperkuat.`, minutes: estMin(15), run: () => startPractice("subject", { subject: foc.subject, title: "Latihan " + foc.subject }) });
+
+  const weakSub = weakestSubjects(1)[0]; // fondasi lemah → baca materi dulu
+  if (weakSub) {
+    const stp = subtopicMastery(weakSub).filter(s => s.subtopic !== "Umum" && s.answered >= 3).sort((a, b) => (a.accuracy ?? 999) - (b.accuracy ?? 999))[0];
+    if (stp && subtopicGapKind(stp) === "foundation")
+      cand.push({ p: 75, icon: "📘", title: `Kuatkan dasar: ${stp.subtopic}`, reason: `Lemah bahkan di soal mudah (${stp.accuracy}%) — baca materinya dulu sebelum latihan.`, minutes: 8, run: () => go("materi", { subject: weakSub, topic: stp.subtopic }) });
+  }
+
+  const leechN = leechQuestionIds().length;
+  if (leechN) cand.push({ p: 55, icon: "🧯", title: `Soal bandel (${leechN})`, reason: "Sering salah berulang — baca materinya, jangan cuma didrill.", minutes: estMin(leechN), run: () => startPractice("leech", { title: "Soal bandel" }) });
+
+  const newN = newQuestionIds().length;
+  if (!cand.length && newN) cand.push({ p: 40, icon: "✨", title: `Soal baru (${newN})`, reason: "Tak ada yang mendesak — perluas cakupan dengan soal yang belum dicoba.", minutes: estMin(newN), run: () => startPractice("new", { title: "Soal baru" }) });
+  if (!cand.length) cand.push({ p: 30, icon: "🔀", title: "Campur cerdas", reason: "Semua review beres 🎉 — jaga ketajaman dengan campuran berprioritas SRS.", minutes: estMin(15), run: () => startPractice("mix", { title: "Campur cerdas" }) });
+
+  cand.sort((a, b) => b.p - a.p);
+  const budget = dailyGoalType() === "minutes" ? dailyGoalMinValue() : Math.round(dailyGoalValue() * mpq);
+  let acc = 0;
+  for (const c of cand) { // batasi ke anggaran menit harian (min 2, max 4 aksi)
+    if (out.length >= 4) break;
+    if (out.length >= 2 && acc + c.minutes > budget * 1.15) break;
+    out.push(c); acc += c.minutes;
+  }
+  return out;
+}
+function coachNarrative() {
+  const bits = [];
+  const mast = subjectMastery().filter(m => m.answered >= 3 && m.accuracy != null);
+  if (mast.length) {
+    const sorted = mast.slice().sort((a, b) => b.accuracy - a.accuracy);
+    const best = sorted[0], worst = sorted[sorted.length - 1];
+    if (best.accuracy >= 70) bits.push(`Kekuatanmu di ${best.subject} (${best.accuracy}%).`);
+    if (worst !== best) bits.push(`Fokus: ${worst.subject} (${worst.accuracy}%).`);
+  }
+  const cal = store.calib;
+  if (cal && cal.sure && cal.sure.n >= 5) {
+    const sureAcc = Math.round((cal.sure.correct / cal.sure.n) * 100);
+    if (sureAcc < 80) bits.push(`Hati-hati overconfident — saat "Yakin" kamu benar ${sureAcc}%.`);
+  }
+  const streak = computeStreak();
+  if (streak >= 2) bits.push(`Streak ${streak} hari — pertahankan! 🔥`);
+  return bits.length ? bits.join(" ") : null;
+}
+function coachActionRow(a) {
+  return el("div", { class: "coach-act" }, [
+    el("span", { class: "ca-ic" }, a.icon),
+    el("div", { class: "ca-body" }, [el("strong", {}, a.title), el("div", { class: "ca-reason" }, a.reason)]),
+    el("div", { class: "ca-side" }, [el("span", { class: "ca-min" }, `≈${a.minutes}m`), el("button", { class: "btn sm primary", onclick: a.run }, "Mulai")]),
+  ]);
+}
+function coachPanel() {
+  const wrap = el("div", { class: "card coach-card", style: "margin-bottom:18px" }, [
+    el("div", { class: "coach-head" }, [el("span", { class: "coach-ic" }, "🧭"), el("h3", { style: "margin:0" }, "Pelatih Belajarmu")]),
+  ]);
+  const narr = coachNarrative();
+  if (narr) wrap.appendChild(el("div", { class: "coach-narr" }, narr));
+  wrap.appendChild(el("div", { class: "coach-plan-label" }, "Rencana hari ini"));
+  coachActions().forEach(a => wrap.appendChild(coachActionRow(a)));
+  return wrap;
+}
+
 function renderStats() {
   const root = app();
   root.innerHTML = "";
@@ -2708,6 +2813,8 @@ function renderStats() {
     return;
   }
 
+  root.appendChild(coachPanel()); // PR1: panel pelatih memimpin halaman Statistik
+
   const dueNow = dueQuestionIds().length;
   root.appendChild(el("div", { class: "stat-cards" }, [
     statCard("🔥", streak, "hari beruntun"),
@@ -2715,6 +2822,8 @@ function renderStats() {
     statCard("🎯", overallAcc == null ? "–" : overallAcc + "%", "akurasi keseluruhan"),
     statCard("📚", sumSeen, "soal dikerjakan"),
   ]));
+
+  root.appendChild(el("h3", { style: "margin:22px 0 4px" }, "Rincian"));
 
   // ----- Prediksi skor & rekomendasi fokus -----
   const pred = predictScore();

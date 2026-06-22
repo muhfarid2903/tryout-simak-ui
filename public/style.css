@@ -825,3 +825,16 @@ body.auth-screen main { max-width: none; margin: 0; padding: 0; }
 .report-btn { background: transparent; border: 1px solid var(--border); color: var(--ui-ink-soft); border-radius: 8px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; flex: none; }
 .report-btn:hover { border-color: var(--red); color: var(--red); }
 .report-btn.on { background: var(--red-bg); border-color: var(--red); color: var(--red); font-weight: 700; }
+
+/* Pelatih Belajar (Rencana Hari Ini + narasi) */
+.coach-card { border-left: 4px solid var(--ui-yellow); }
+.coach-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.coach-head .coach-ic { font-size: 22px; }
+.coach-narr { font-size: 14px; background: var(--surface-soft); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+.coach-plan-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ui-ink-soft); margin-bottom: 4px; }
+.coach-act { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.coach-act .ca-ic { font-size: 20px; flex: none; width: 26px; text-align: center; }
+.coach-act .ca-body { flex: 1 1 200px; min-width: 0; }
+.coach-act .ca-reason { font-size: 12.5px; color: var(--ui-ink-soft); margin-top: 2px; }
+.coach-act .ca-side { display: flex; align-items: center; gap: 10px; margin-left: auto; flex: none; }
+.coach-act .ca-min { font-size: 12px; color: var(--ui-ink-soft); }
