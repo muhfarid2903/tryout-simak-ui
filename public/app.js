@@ -1305,11 +1305,13 @@ function renderHome() {
   // Pelatih: pointer ke Rencana Hari Ini (PR1) — muncul bila sudah ada data latihan.
   if (store.questions.length && Object.values(store.qstats).reduce((a, s) => a + (s.seen || 0), 0) > 0) {
     const nActs = coachActions().length;
+    const dleft = daysUntilExam();
     root.appendChild(el("div", { class: "focus-banner", style: "margin-bottom:14px" }, [
       el("span", { class: "rb-icon" }, "🧭"),
       el("div", { style: "flex:1" }, [
         el("strong", {}, "Rencana dari pelatihmu"),
-        el("div", { style: "font-size:13px" }, nActs ? `${nActs} langkah disiapkan untuk hari ini.` : "Buka untuk melihat langkah berikutnya."),
+        el("div", { style: "font-size:13px" }, (nActs ? `${nActs} langkah disiapkan untuk hari ini.` : "Buka untuk melihat langkah berikutnya.")
+          + (dleft != null && dleft > 0 ? ` · ${dleft} hari menuju ujian` : "")),
       ]),
       el("button", { class: "btn sm primary", onclick: () => go("stats") }, "Buka rencana"),
     ]));
@@ -2766,6 +2768,78 @@ function coachNarrative() {
   if (streak >= 2) bits.push(`Streak ${streak} hari — pertahankan! 🔥`);
   return bits.length ? bits.join(" ") : null;
 }
+/* ---------- Manajer: Target & tenggat (PR2) ----------
+   Goal-setting theory (Locke & Latham): tujuan spesifik + tenggat + umpan balik → performa.
+   Honest: prediksi = estimasi internal; status bersifat panduan kualitatif, bukan ramalan pasti. */
+function dailyGoalCount() {
+  return dailyGoalType() === "minutes" ? Math.max(1, Math.round(dailyGoalMinValue() / avgMinPerQ())) : dailyGoalValue();
+}
+function daysUntilExam() {
+  const d = store.settings.examDate;
+  if (!d) return null;
+  const end = new Date(d + "T23:59:59").getTime();
+  if (isNaN(end)) return null;
+  return Math.ceil((end - Date.now()) / SRS_DAY);
+}
+function targetStatus(P, T, days) {
+  if (days != null && days <= 0) return { tone: "mid", status: "Hari ujian / sudah lewat — semoga lancar! 🍀" };
+  if (P == null) return { tone: "mid", status: "Kerjakan beberapa soal agar prediksi & trajektori muncul." };
+  const gap = T - P;
+  if (gap <= 0) return { tone: "good", status: "✅ Sudah di atas target — pertahankan konsistensi." };
+  const weeks = Math.max(0.5, (days == null ? 7 : days) / 7);
+  const perWeek = gap / weeks;
+  if (perWeek <= 2) return { tone: "good", status: "🟢 On-track — lanjutkan rencana harian." };
+  if (perWeek <= 5) return { tone: "mid", status: "🟡 Perlu konsisten — jangan bolong latihan." };
+  return { tone: "bad", status: "🔴 Perlu ngebut — tambah porsi harian." };
+}
+function targetSetupForm() {
+  const dateIn = el("input", { type: "date", value: store.settings.examDate || "" });
+  const tgtIn = el("input", { type: "number", min: "1", max: "100", placeholder: "mis. 75", value: store.settings.targetScore != null ? String(store.settings.targetScore) : "" });
+  const save = el("button", { class: "btn sm primary", onclick: () => {
+    const dv = dateIn.value, tv = parseInt(tgtIn.value, 10);
+    if (dv) store.settings.examDate = dv; else delete store.settings.examDate;
+    if (tv >= 1 && tv <= 100) store.settings.targetScore = tv; else delete store.settings.targetScore;
+    saveStore(); toast("Target tersimpan"); renderStats();
+  } }, "Simpan");
+  return el("div", { class: "target-form" }, [
+    el("label", {}, [el("span", {}, "Tanggal ujian SIMAK"), dateIn]),
+    el("label", {}, [el("span", {}, "Target skor (%)"), tgtIn]),
+    save,
+  ]);
+}
+function targetBlock() {
+  if (store.settings.targetScore == null || !store.settings.examDate) {
+    return el("div", { class: "coach-target setup" }, [
+      el("div", { class: "ct-title" }, "🎯 Tetapkan target & tanggal ujian"),
+      el("div", { class: "ct-sub" }, "Manajer butuh tujuan: set target skor & tanggal SIMAK untuk melihat trajektori & porsi harianmu."),
+      targetSetupForm(),
+    ]);
+  }
+  const pred = predictScore(), P = pred ? pred.pred : null, T = store.settings.targetScore, days = daysUntilExam();
+  const wrap = el("div", { class: "coach-target" }, [
+    el("div", { class: "ct-head" }, [
+      el("span", {}, P == null ? `Target ${T}%` : `Prediksi ${P}% → Target ${T}%`),
+      el("span", { class: "ct-days" }, days == null ? "" : days > 0 ? `${days} hari lagi` : (days === 0 ? "hari ini!" : "sudah lewat")),
+    ]),
+  ]);
+  if (P != null) {
+    const pctOfTarget = Math.max(0, Math.min(100, Math.round((P / T) * 100)));
+    wrap.appendChild(el("div", { class: "meter" }, [el("div", { class: "meter-fill " + (P >= T ? "good" : pctOfTarget >= 80 ? "mid" : "bad"), style: `width:${pctOfTarget}%` })]));
+  }
+  const st = targetStatus(P, T, days);
+  wrap.appendChild(el("div", { class: "ct-status " + st.tone }, st.status));
+  if (P != null && T - P > 0 && days != null && days > 0) {
+    let perDay = Math.max(dailyGoalCount(), Math.ceil(dueQuestionIds().length / Math.max(1, Math.min(days, 14))));
+    if (st.tone === "bad") perDay = Math.ceil(perDay * 1.5);
+    perDay = Math.min(perDay, 60);
+    wrap.appendChild(el("div", { class: "ct-presc" }, `Saran: jaga ≈${perDay} soal/hari agar review tak menumpuk & progres jalan. Eksekusinya = "Rencana hari ini" di bawah.`));
+  }
+  wrap.appendChild(el("p", { class: "q-meta", style: "margin:6px 0 0" }, "Prediksi = estimasi internal, bukan skor resmi SIMAK."));
+  const det = el("details", { class: "bank-materi" }, [el("summary", {}, "Ubah target & tanggal")]);
+  det.appendChild(el("div", { class: "bank-materi-body" }, [targetSetupForm()]));
+  wrap.appendChild(det);
+  return wrap;
+}
 function coachActionRow(a) {
   return el("div", { class: "coach-act" }, [
     el("span", { class: "ca-ic" }, a.icon),
@@ -2777,11 +2851,79 @@ function coachPanel() {
   const wrap = el("div", { class: "card coach-card", style: "margin-bottom:18px" }, [
     el("div", { class: "coach-head" }, [el("span", { class: "coach-ic" }, "🧭"), el("h3", { style: "margin:0" }, "Pelatih Belajarmu")]),
   ]);
+  wrap.appendChild(targetBlock()); // PR2: manajer — menuju target & tenggat
   const narr = coachNarrative();
   if (narr) wrap.appendChild(el("div", { class: "coach-narr" }, narr));
   wrap.appendChild(el("div", { class: "coach-plan-label" }, "Rencana hari ini"));
   coachActions().forEach(a => wrap.appendChild(coachActionRow(a)));
   return wrap;
+}
+
+/* ---------- Manajer: cakupan bank, tinjauan mingguan, rebalancing (PR3) ----------
+   Manajer kampanye: pastikan cakupan (breadth) lintas bank besar, jaga konsistensi
+   (habit/SRL monitoring), dan alokasikan usaha minggu ini ke yang paling butuh. */
+function isMasteredQ(id) { const st = store.qstats[id]; return !!(st && (st.reps || 0) >= 2 && st.lastResult === "correct"); }
+function bankCoverage() {
+  const agg = {};
+  store.questions.forEach(q => {
+    const s = q.subject || "Lainnya";
+    const a = agg[s] || (agg[s] = { subject: s, total: 0, attempted: 0, mastered: 0 });
+    a.total++;
+    const st = store.qstats[q.id];
+    if (st && st.seen) a.attempted++;
+    if (isMasteredQ(q.id)) a.mastered++;
+  });
+  return Object.values(agg).map(a => ({ ...a, pct: a.total ? Math.round((a.attempted / a.total) * 100) : 0 })).sort((x, y) => x.pct - y.pct);
+}
+function last7DayKeys() { const out = [], now = Date.now(); for (let i = 0; i < 7; i++) out.push(dayKey(now - i * SRS_DAY)); return out; }
+function weeklyReview() {
+  const keys = last7DayKeys(), active = activityDays();
+  return { activeDays: keys.filter(k => active.has(k)).length, answered: keys.reduce((a, k) => a + ((store.daily && store.daily[k]) || 0), 0) };
+}
+function rebalancePlan() {
+  const mast = {}; subjectMastery().forEach(m => { mast[m.subject] = m.accuracy; });
+  const weighted = bankCoverage().map(c => {
+    const acc = mast[c.subject];
+    const gap = acc == null ? 0.5 : (100 - acc) / 100;            // makin lemah makin butuh
+    const covNeed = c.total ? 1 - c.attempted / c.total : 0;      // makin sedikit dikerjakan makin butuh
+    return { subject: c.subject, w: Math.max(0.05, 0.6 * gap + 0.4 * covNeed) };
+  });
+  const sum = weighted.reduce((a, x) => a + x.w, 0) || 1;
+  return weighted.map(x => ({ subject: x.subject, pct: Math.round((x.w / sum) * 100) })).sort((a, b) => b.pct - a.pct);
+}
+function managerCards() {
+  const out = [];
+  const wk = weeklyReview();
+  const card = el("div", { class: "card", style: "margin-bottom:18px" }, [el("h3", { style: "margin-top:0" }, "Tinjauan Mingguan")]);
+  card.appendChild(el("div", { class: "stat-cards" }, [
+    statCard("📆", `${wk.activeDays}/7`, "hari aktif minggu ini"),
+    statCard("✍️", wk.answered, "soal minggu ini"),
+  ]));
+  const reb = rebalancePlan().filter(r => r.pct > 0).slice(0, 4);
+  if (reb.length) {
+    card.appendChild(el("div", { class: "coach-plan-label", style: "margin-top:12px" }, "Saran alokasi fokus minggu ini"));
+    card.appendChild(el("div", { class: "rebal" }, reb.map(r =>
+      el("button", { class: "rebal-chip", onclick: () => startPractice("subject", { subject: r.subject, title: "Latihan " + r.subject }) }, `${r.subject} · ${r.pct}%`))));
+  }
+  out.push(card);
+
+  const cov = bankCoverage();
+  if (cov.length) {
+    const cc = el("div", { class: "card", style: "margin-bottom:18px" }, [
+      el("h3", { style: "margin-top:0" }, "Cakupan Bank"),
+      el("p", { class: "q-meta", style: "margin-top:0" }, "Berapa banyak bank yang sudah kamu sentuh & kuasai per mata uji."),
+    ]);
+    cov.forEach(c => {
+      const tone = c.pct >= 75 ? "good" : c.pct >= 40 ? "mid" : "bad";
+      cc.appendChild(el("div", { class: "mastery-row" }, [
+        el("div", { class: "mr-head" }, [el("strong", {}, c.subject), el("span", { class: "mr-acc " + tone }, `${c.pct}%`)]),
+        el("div", { class: "meter" }, [el("div", { class: "meter-fill " + tone, style: `width:${c.pct}%` })]),
+        el("div", { class: "mr-meta" }, [el("span", {}, `${c.attempted}/${c.total} dikerjakan · ${c.mastered} dikuasai`)]),
+      ]));
+    });
+    out.push(cc);
+  }
+  return out;
 }
 
 function renderStats() {
@@ -2822,6 +2964,8 @@ function renderStats() {
     statCard("🎯", overallAcc == null ? "–" : overallAcc + "%", "akurasi keseluruhan"),
     statCard("📚", sumSeen, "soal dikerjakan"),
   ]));
+
+  managerCards().forEach(c => root.appendChild(c)); // PR3: manajer — mingguan, rebalancing, cakupan bank
 
   root.appendChild(el("h3", { style: "margin:22px 0 4px" }, "Rincian"));
 
