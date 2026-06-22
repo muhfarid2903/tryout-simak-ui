@@ -1290,6 +1290,18 @@ function renderHome() {
   // Target belajar harian (cincin progres).
   root.appendChild(dailyGoalCard());
 
+  // Tes Diagnostik (cold-start): titik masuk menonjol bila belum pernah & bank cukup besar.
+  if (store.questions.length >= 8 && !store.settings.diagnosticDoneAt) {
+    root.appendChild(el("div", { class: "focus-banner", style: "margin-bottom:14px" }, [
+      el("span", { class: "rb-icon" }, "📋"),
+      el("div", { style: "flex:1" }, [
+        el("strong", {}, "Mulai dari Tes Diagnostik"),
+        el("div", { style: "font-size:13px" }, "≈15 menit lintas mata uji — temukan titik lemahmu, hasilnya langsung jadi rencana belajar."),
+      ]),
+      el("button", { class: "btn sm primary", onclick: () => startPractice("diagnostic", { title: "Tes Diagnostik" }) }, "Mulai"),
+    ]));
+  }
+
   // Sesi kilat untuk pengguna sibuk: 7 soal prioritas (jatuh tempo + bandel + terlemah).
   if (store.questions.length) {
     root.appendChild(el("div", { class: "focus-banner", style: "margin-bottom:14px" }, [
@@ -2951,6 +2963,7 @@ function renderPractice() {
   const hcN = hcMissQuestionIds().length;
   const taggedN = store.questions.filter(q => DIFFICULTY_LEVELS.includes(q.difficulty)).length;
   const grid = el("div", { class: "grid" }, [
+    store.questions.length >= 8 ? practiceCard("📋", "Tes Diagnostik", store.settings.diagnosticDoneAt ? "ukur ulang kelemahan lintas mata uji" : "ukur kelemahan lintas mata uji", false, () => startPractice("diagnostic", { title: "Tes Diagnostik" })) : null,
     practiceCard("⚡", "Review 5 menit", "sesi kilat · 7 soal prioritas", false, () => startPractice("micro", { title: "Review 5 menit" })),
     practiceCard("📅", "Review hari ini", dueN ? `${dueN} soal jatuh tempo` : "tidak ada yang jatuh tempo", dueN === 0, () => startPractice("due", { title: "Review hari ini" })),
     hcN ? practiceCard("⚠️", "Yakin tapi salah", `${hcN} soal · kamu yakin tapi keliru — paling penting dikoreksi`, false, () => startPractice("hcmiss", { title: "Yakin tapi salah" })) : null,
@@ -3031,6 +3044,31 @@ function practiceAtEnd() {
   return ps.idx === ps.pool.length - 1;
 }
 
+// Tes Diagnostik (cold-start): sampel berimbang lintas mata uji × kesulitan, utamakan soal
+// yang belum pernah dikerjakan, dibatasi ~perSubject/mata uji agar singkat. Testing/pre-testing
+// effect: mengukur sekaligus mulai belajar & menyemai data (SRS/qstats) sejak menit pertama.
+function diagnosticQuestionIds(perSubject = 5) {
+  const subjects = [...new Set(store.questions.map(q => q.subject || "Lainnya"))];
+  const seenOf = id => (store.qstats[id] && store.qstats[id].seen) || 0;
+  const out = [];
+  subjects.forEach(s => {
+    const byd = { 1: [], 2: [], 3: [], 0: [] };
+    store.questions.forEach(q => { if ((q.subject || "Lainnya") === s) byd[DIFFICULTY_LEVELS.includes(q.difficulty) ? q.difficulty : 0].push(q); });
+    const rank = arr => arr.slice().sort((a, b) => (seenOf(a.id) - seenOf(b.id)) || (srsPriority(b.id) - srsPriority(a.id))); // belum pernah dulu
+    const sorted = { 1: rank(byd[1]), 2: rank(byd[2]), 3: rank(byd[3]), 0: rank(byd[0]) };
+    const cur = { 1: 0, 2: 0, 3: 0, 0: 0 }, picks = [];
+    let guard = 0;
+    while (picks.length < perSubject && guard++ < perSubject * 4) { // sebar lintas level: 1→2→3 bergiliran
+      let added = false;
+      for (const dlv of [1, 2, 3]) if (picks.length < perSubject && cur[dlv] < sorted[dlv].length) { picks.push(sorted[dlv][cur[dlv]++]); added = true; }
+      if (!added) break;
+    }
+    while (picks.length < perSubject && cur[0] < sorted[0].length) picks.push(sorted[0][cur[0]++]); // lengkapi dari yang belum ber-tag
+    out.push(...picks.map(q => q.id));
+  });
+  return out;
+}
+
 function startPractice(mode, opts = {}) {
   if (mode === "ladder") { startLadder(opts); return; }
   const byId = {}; store.questions.forEach(q => byId[q.id] = q);
@@ -3052,6 +3090,7 @@ function startPractice(mode, opts = {}) {
     (q.subject || "Lainnya") === opts.subject && (q.subtopic || "Umum") === opts.subtopic &&
     (opts.difficulty == null || q.difficulty === opts.difficulty)).map(q => q.id);
   else if (mode === "weakness") { const subs = new Set(weakestSubjects(3)); ids = store.questions.filter(q => subs.has(q.subject || "Lainnya")).map(q => q.id); }
+  else if (mode === "diagnostic") ids = diagnosticQuestionIds();
   else ids = store.questions.map(q => q.id);
 
   let qs = ids.map(id => byId[id]).filter(Boolean);
@@ -3065,10 +3104,12 @@ function startPractice(mode, opts = {}) {
       : mode === "micro" ? "Belum ada soal untuk direview. Coba kerjakan beberapa soal dulu 👍"
       : mode === "weakness" ? "Kerjakan beberapa soal dulu — kelemahanmu akan terdeteksi otomatis 👍"
       : mode === "subtopic" ? "Belum ada soal untuk topik ini"
+      : mode === "diagnostic" ? "Belum cukup soal untuk diagnostik"
       : "Belum ada soal");
     return;
   }
   if (mode === "subject" || mode === "subtopic" || mode === "new") qs = shuffle(qs);
+  else if (mode === "diagnostic") qs = interleaveBySubject(qs); // jaga sebaran kesulitan, hanya selang-seling mata uji
   else qs = interleaveBySubject(qs.slice().sort((a, b) => srsPriority(b.id) - srsPriority(a.id))); // prioritas SRS + selang-seling mata uji
   qs = qs.slice(0, mode === "micro" ? 7 : 25);
   const prepared = qs.map(q => prepareQuestion(q, true));
@@ -3224,10 +3265,103 @@ function finishPractice() {
   if (!ps) { go("practice"); return; }
   store.practiceLog.push(Date.now());
   if (store.practiceLog.length > 500) store.practiceLog = store.practiceLog.slice(-500);
+  if (ps.mode === "diagnostic") store.settings.diagnosticDoneAt = Date.now();
   saveStore();
+  if (ps.mode === "diagnostic") { const data = buildDiagnosticSummary(ps); practiceState = null; renderDiagnosticResult(data); return; }
   const summary = { title: ps.title, mode: ps.mode, subject: ps.subject, total: ps.pool.length, done: ps.revealed.filter(Boolean).length, correct: ps.correct, wrong: ps.wrong };
   practiceState = null;
   renderPracticeSummary(summary);
+}
+// Ringkas hasil diagnostik dari state sesi: akurasi per mata uji, per level, & per sub-topik.
+function buildDiagnosticSummary(ps) {
+  const bySubject = {}, byDiff = { 1: { a: 0, c: 0 }, 2: { a: 0, c: 0 }, 3: { a: 0, c: 0 } }, bySubtopic = {};
+  let answered = 0, correct = 0;
+  ps.pool.forEach((q, i) => {
+    if (!ps.revealed[i] || ps.answers[i] == null) return; // dilewati / tak dijawab tak dihitung
+    const ok = q.order[ps.answers[i]] === q.answer;
+    answered++; if (ok) correct++;
+    const s = q.subject || "Lainnya";
+    const a = bySubject[s] || (bySubject[s] = { subject: s, answered: 0, correct: 0 });
+    a.answered++; if (ok) a.correct++;
+    if (DIFFICULTY_LEVELS.includes(q.difficulty)) { byDiff[q.difficulty].a++; if (ok) byDiff[q.difficulty].c++; }
+    if (q.subtopic) { const k = s + " · " + q.subtopic; const t = bySubtopic[k] || (bySubtopic[k] = { key: k, subject: s, subtopic: q.subtopic, answered: 0, correct: 0 }); t.answered++; if (ok) t.correct++; }
+  });
+  const acc = o => o.answered ? Math.round((o.correct / o.answered) * 100) : null;
+  const subjects = Object.values(bySubject).map(o => ({ ...o, accuracy: acc(o) })).sort((x, y) => (x.accuracy ?? 999) - (y.accuracy ?? 999));
+  const subtopics = Object.values(bySubtopic).map(o => ({ ...o, accuracy: acc(o) })).filter(t => t.accuracy != null).sort((x, y) => x.accuracy - y.accuracy);
+  return { total: ps.pool.length, answered, correct, subjects, byDiff, subtopics };
+}
+function renderDiagnosticResult(d) {
+  const root = app();
+  root.innerHTML = "";
+  const accAll = d.answered ? Math.round((d.correct / d.answered) * 100) : 0;
+  root.appendChild(el("div", { class: "score-hero" }, [
+    el("div", {}, "Tes Diagnostik Selesai 📋"),
+    el("div", { class: "big" }, accAll + "%"),
+    el("div", {}, `${d.correct} benar dari ${d.answered} dijawab (${d.total} soal)`),
+  ]));
+  if (!d.answered) {
+    root.appendChild(emptyState("📋", "Belum ada jawaban", "Kamu melewati semua soal. Coba lagi dan jawab beberapa untuk melihat peta kemampuanmu.",
+      el("button", { class: "btn primary", onclick: () => startPractice("diagnostic", { title: "Tes Diagnostik" }) }, "Ulangi diagnostik")));
+    return;
+  }
+
+  // Peta kemampuan per mata uji (terlemah di atas).
+  const map = el("div", { class: "card", style: "margin-bottom:18px" }, [el("h3", { style: "margin-top:0" }, "Peta Kemampuan per Mata Uji")]);
+  d.subjects.forEach(s => {
+    const tone = accTone(s.accuracy), a = s.accuracy ?? 0;
+    map.appendChild(el("div", { class: "mastery-row" }, [
+      el("div", { class: "mr-head" }, [el("strong", {}, s.subject), el("span", { class: "mr-acc " + tone }, s.accuracy == null ? "–" : s.accuracy + "%")]),
+      el("div", { class: "meter" }, [el("div", { class: "meter-fill " + tone, style: `width:${a}%` })]),
+      el("div", { class: "mr-meta" }, [
+        el("span", {}, `${s.correct}/${s.answered} benar`),
+        el("span", { style: "flex:1" }),
+        el("button", { class: "btn sm", onclick: () => startPractice("subject", { subject: s.subject, title: "Latihan " + s.subject }) }, "Latih →"),
+      ]),
+    ]));
+  });
+  root.appendChild(map);
+
+  // Per level kesulitan (bedakan masalah fondasi vs naik-level).
+  const diffRows = DIFFICULTY_LEVELS.filter(v => d.byDiff[v].a > 0);
+  if (diffRows.length) {
+    const card = el("div", { class: "card", style: "margin-bottom:18px" }, [el("h3", { style: "margin-top:0" }, "Per Level Kesulitan")]);
+    diffRows.forEach(v => {
+      const o = d.byDiff[v], a = Math.round((o.c / o.a) * 100), tone = accTone(a);
+      card.appendChild(el("div", { class: "mastery-row" }, [
+        el("div", { class: "mr-head" }, [el("strong", {}, `${DIFFICULTY[v].icon} ${DIFFICULTY[v].label}`), el("span", { class: "mr-acc " + tone }, a + "%")]),
+        el("div", { class: "meter" }, [el("div", { class: "meter-fill " + tone, style: `width:${a}%` })]),
+        el("div", { class: "mr-meta" }, [el("span", {}, `${o.c}/${o.a} benar`)]),
+      ]));
+    });
+    root.appendChild(card);
+  }
+
+  // Rencana belajar: 2 mata uji terlemah + ajakan ke materi sub-topik terlemah.
+  const weak = d.subjects.filter(s => s.accuracy != null).slice(0, 2);
+  if (weak.length) {
+    const plan = el("div", { class: "card", style: "margin-bottom:18px" }, [el("h3", { style: "margin-top:0" }, "Rencana Belajarmu")]);
+    weak.forEach(s => plan.appendChild(el("div", { class: "focus-banner", style: "margin-bottom:10px" }, [
+      el("span", { class: "rb-icon" }, "🎯"),
+      el("div", { style: "flex:1" }, [el("strong", {}, s.subject), el("div", { style: "font-size:13px" }, `Akurasi ${s.accuracy}% — mulai dari sini.`)]),
+      el("button", { class: "btn sm primary", onclick: () => startPractice("subject", { subject: s.subject, title: "Latihan " + s.subject }) }, "Latih"),
+    ])));
+    const wt = d.subtopics[0];
+    if (wt) plan.appendChild(el("div", { class: "remediation", style: "margin-top:0" }, [
+      el("span", { class: "rem-ic" }, "📘"),
+      el("span", { class: "rem-txt" }, `Sub-topik terlemah: ${wt.subtopic} (${wt.accuracy}%)`),
+      el("button", { class: "btn sm", onclick: () => go("materi", { subject: wt.subject, topic: wt.subtopic }) }, "Buka materi"),
+    ]));
+    plan.appendChild(el("p", { class: "q-meta", style: "margin:10px 0 0" }, "Semua soal tadi sudah masuk jadwal review (spaced repetition) — buka Latihan → Review hari ini untuk mengulang di waktu yang tepat."));
+    root.appendChild(plan);
+  }
+
+  root.appendChild(el("p", { class: "q-meta" }, "Ini potret awal dari sampel soal — estimasi internal untuk memandu, bukan skor resmi SIMAK. Makin banyak kamu berlatih, makin akurat statistikmu."));
+  root.appendChild(el("div", { class: "btn-row", style: "margin-top:4px" }, [
+    el("button", { class: "btn primary", onclick: () => go("stats") }, "📊 Lihat Statistik"),
+    el("button", { class: "btn", onclick: () => go("practice") }, "🏋️ Buka Latihan"),
+    el("button", { class: "btn", onclick: () => go("home") }, "Beranda"),
+  ]));
 }
 function renderPracticeSummary(s) {
   const root = app();
