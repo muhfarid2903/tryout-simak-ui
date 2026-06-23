@@ -1,7 +1,7 @@
 {
-  "name": "tryout-simak-ui",
+  "name": "tryout-superr",
   "version": "1.0.0",
-  "description": "Tryout SIMAK UI Pascasarjana — latihan soal dengan login & sinkron antar perangkat.",
+  "description": "Tryout Superr — latihan soal dengan login & sinkron antar perangkat.",
   "type": "module",
   "main": "server.js",
   "scripts": {

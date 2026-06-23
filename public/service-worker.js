@@ -61,7 +61,7 @@ self.addEventListener("periodicsync", (event) => {
   if (event.tag === "review-reminder") {
     event.waitUntil(
       self.registration.showNotification("Waktunya review 📅", {
-        body: "Buka Tryout SIMAK UI untuk mengulang soal yang jatuh tempo hari ini.",
+        body: "Buka Tryout Superr untuk mengulang soal yang jatuh tempo hari ini.",
         icon: "./icon.svg",
         badge: "./icon.svg",
         tag: "review-reminder",

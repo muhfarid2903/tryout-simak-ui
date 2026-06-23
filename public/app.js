@@ -9,6 +9,10 @@ const EXAM_KEY = "tryout_simak_ui_ppds_2026_exam_v1"; // progress tryout berjala
 const OPT_KEYS = ["A", "B", "C", "D", "E"];
 const SCORE = { correct: 4, wrong: -1, empty: 0 };
 const PRESET_SUBJECTS = ["Kemampuan Verbal", "Kemampuan Kuantitatif", "Kemampuan Penalaran", "Bahasa Inggris"];
+// Program tryout yang didukung (kategori di atas paket). Urutan = urutan tampil di filter.
+const PROGRAMS = ["SIMAK UI", "SIMAK UI Pascasarjana", "TOEFL", "SBMPTN", "UKMPPD (Dokter)"];
+const PROGRAM_OTHER = "Lainnya"; // label untuk paket tanpa program (data lama / impor)
+function programOf(p) { return (p && p.program) ? p.program : PROGRAM_OTHER; }
 const DEFAULT_SECTION_MIN = 30;
 const SRS_DAY = 86400000; // 1 hari dalam ms (penjadwalan spaced repetition)
 // Level kesulitan per soal (ditandai admin). null = belum ditandai.
@@ -467,6 +471,7 @@ function normalizeStore(s) {
   s.calib = s.calib || { sure: { n: 0, correct: 0 }, unsure: { n: 0, correct: 0 }, guess: { n: 0, correct: 0 } };
   if (s._updatedAt == null) s._updatedAt = 0; // penanda versi untuk sinkron antar perangkat
   s.packages.forEach(p => {
+    if (p.program == null) p.program = ""; // "" = belum dikategorikan (tampil sebagai "Lainnya")
     if (!p.mode) p.mode = "sections";
     if (p.durationMin == null) p.durationMin = 90;
     if (!p.sectionMinutes) p.sectionMinutes = {};
@@ -513,11 +518,31 @@ function prepareImported(data) {
 
 function seedStore() {
   const pkgId = uid();
+  const toeflId = uid(), sbmptnId = uid(), ukmppdId = uid();
   return {
     packages: [{
       id: pkgId, name: "Tryout SIMAK UI PPDS 2026 — TPA & Bahasa Inggris",
+      program: "SIMAK UI Pascasarjana",
       mode: "sections", durationMin: 150,
       sectionMinutes: { "Kemampuan Verbal": 30, "Kemampuan Kuantitatif": 30, "Kemampuan Penalaran": 30, "Bahasa Inggris": 60 },
+      shuffleQuestions: true, shuffleOptions: true, createdAt: Date.now(),
+    }, {
+      id: toeflId, name: "Contoh Tryout TOEFL ITP — Structure & Reading",
+      program: "TOEFL",
+      mode: "sections", durationMin: 50,
+      sectionMinutes: { "Structure & Written Expression": 25, "Reading Comprehension": 25 },
+      shuffleQuestions: true, shuffleOptions: true, createdAt: Date.now(),
+    }, {
+      id: sbmptnId, name: "Contoh Tryout SBMPTN (UTBK) — TPS",
+      program: "SBMPTN",
+      mode: "sections", durationMin: 45,
+      sectionMinutes: { "Penalaran Umum": 15, "Pengetahuan Kuantitatif": 20, "Pemahaman Bacaan & Menulis": 10 },
+      shuffleQuestions: true, shuffleOptions: true, createdAt: Date.now(),
+    }, {
+      id: ukmppdId, name: "Contoh Tryout UKMPPD — Ilmu Klinik",
+      program: "UKMPPD (Dokter)",
+      mode: "sections", durationMin: 40,
+      sectionMinutes: { "Ilmu Penyakit Dalam": 15, "Ilmu Kesehatan Anak": 10, "Kardiologi": 15 },
       shuffleQuestions: true, shuffleOptions: true, createdAt: Date.now(),
     }],
     questions: [
@@ -568,6 +593,88 @@ function seedStore() {
         text: "The patient's symptoms were ___ with the initial diagnosis, so no further tests were ordered.\n\nChoose the best word.", image: "",
         options: ["consistent", "consist", "consistence", "consisting", "consisted"], answer: 0,
         pembahasan: "'be consistent with' = sesuai/selaras dengan. Bentuk yang tepat adalah adjektiva 'consistent'. Jawaban: A." },
+
+      // ===================== TOEFL ITP =====================
+      // ----- Structure & Written Expression -----
+      { id: uid(), packageId: toeflId, subject: "Structure & Written Expression", subtopic: "Subject–Verb Agreement", difficulty: 2,
+        text: "Each of the students in the advanced class ___ required to submit a research proposal.\n\nChoose the option that best completes the sentence.", image: "",
+        options: ["is", "are", "being", "have been"], answer: 0,
+        pembahasan: "Subjek 'Each of the students' bersifat tunggal (each), sehingga verba tunggal 'is' yang tepat. Jawaban: A." },
+      { id: uid(), packageId: toeflId, subject: "Structure & Written Expression", subtopic: "Error Identification", difficulty: 2,
+        text: "The number of applicants (A) have (B) increased significantly (C) over the past decade (D).\n\nIdentify the underlined part that is incorrect.", image: "",
+        options: ["(A) The number of", "(B) have", "(C) significantly", "(D) over the past decade"], answer: 1,
+        pembahasan: "'The number of' menuntut verba tunggal → seharusnya 'has', bukan 'have'. Jawaban: B." },
+      { id: uid(), packageId: toeflId, subject: "Structure & Written Expression", subtopic: "Reduced Clauses", difficulty: 3,
+        text: "___ the lecture, the students asked several thoughtful questions.\n\nChoose the best option.", image: "",
+        options: ["After listening to", "After they listened", "They listened to", "Listened to"], answer: 0,
+        pembahasan: "Frasa pereduksi yang gramatikal adalah 'After listening to' (klausa direduksi menjadi frasa -ing). Jawaban: A." },
+      // ----- Reading Comprehension -----
+      { id: uid(), packageId: toeflId, subject: "Reading Comprehension", subtopic: "Vocabulary in Context", difficulty: 2,
+        text: "Coral reefs are remarkably diverse ecosystems, yet they are extremely fragile and vulnerable to even slight changes in water temperature.\n\nThe word \"fragile\" is closest in meaning to ___.", image: "",
+        options: ["delicate", "colorful", "ancient", "enormous"], answer: 0,
+        pembahasan: "'Fragile' = mudah rusak/rapuh, paling dekat dengan 'delicate'. Jawaban: A." },
+      { id: uid(), packageId: toeflId, subject: "Reading Comprehension", subtopic: "Main Idea & Inference", difficulty: 2,
+        text: "Coral reefs are remarkably diverse ecosystems, yet they are extremely fragile and vulnerable to even slight changes in water temperature.\n\nIt can be inferred from the passage that coral reefs ___.", image: "",
+        options: ["can be harmed by small environmental changes", "are the largest ecosystems on Earth", "thrive in cold water only", "are not affected by temperature"], answer: 0,
+        pembahasan: "Teks menyebut reef rentan terhadap perubahan suhu kecil, sehingga simpulan yang tepat: perubahan lingkungan kecil pun dapat merusaknya. Jawaban: A." },
+
+      // ===================== SBMPTN (UTBK) — TPS =====================
+      // ----- Penalaran Umum -----
+      { id: uid(), packageId: sbmptnId, subject: "Penalaran Umum", subtopic: "Silogisme", difficulty: 2,
+        text: "Semua siswa yang lulus seleksi mengikuti pembekalan. Sebagian peserta pembekalan mendapat beasiswa. Simpulan yang PASTI benar adalah ...", image: "",
+        options: [
+          "Semua siswa yang lulus seleksi mendapat beasiswa",
+          "Sebagian siswa yang lulus seleksi mungkin mendapat beasiswa",
+          "Semua penerima beasiswa lulus seleksi",
+          "Tidak ada penerima beasiswa yang lulus seleksi",
+          "Semua peserta pembekalan lulus seleksi",
+        ], answer: 1,
+        pembahasan: "Hanya pernyataan yang tidak melakukan overgeneralisasi yang pasti benar. Jawaban: B." },
+      { id: uid(), packageId: sbmptnId, subject: "Penalaran Umum", subtopic: "Pola Bilangan", difficulty: 1,
+        text: "Suku berikutnya dari deret 4, 9, 16, 25, ... adalah ...", image: "",
+        options: ["30", "32", "36", "40", "49"], answer: 2,
+        pembahasan: "Deret kuadrat: $2^2,3^2,4^2,5^2$, jadi berikutnya $6^2=36$. Jawaban: C." },
+      // ----- Pengetahuan Kuantitatif -----
+      { id: uid(), packageId: sbmptnId, subject: "Pengetahuan Kuantitatif", subtopic: "Aljabar", difficulty: 2,
+        text: "Jika $2x + 3 = 11$, maka nilai dari $5x - 4$ adalah ...", image: "",
+        options: ["12", "16", "18", "21", "24"], answer: 1,
+        pembahasan: "Dari $2x+3=11$ diperoleh $x=4$. Maka $5x-4 = 20-4 = 16$. Jawaban: B." },
+      { id: uid(), packageId: sbmptnId, subject: "Pengetahuan Kuantitatif", subtopic: "Persen & Perbandingan", difficulty: 2,
+        text: "Sebuah toko menaikkan harga 25%, lalu memberi diskon 20% dari harga baru. Dibanding harga awal, harga akhir ...", image: "",
+        options: ["naik 5%", "tetap sama", "turun 5%", "naik 10%", "turun 10%"], answer: 1,
+        pembahasan: "Harga akhir $= 1{,}25 \\times 0{,}80 = 1{,}00$ dari harga awal, jadi tidak berubah. Jawaban: B." },
+      // ----- Pemahaman Bacaan & Menulis -----
+      { id: uid(), packageId: sbmptnId, subject: "Pemahaman Bacaan & Menulis", subtopic: "Kalimat Efektif", difficulty: 2,
+        text: "Kalimat berikut yang paling efektif adalah ...", image: "",
+        options: [
+          "Para hadirin sekalian dimohon untuk berdiri.",
+          "Hadirin dimohon berdiri.",
+          "Kepada para hadirin sekalian dimohonkan agar supaya berdiri.",
+          "Untuk para hadirin semuanya dimohon berdiri.",
+          "Hadirin sekalian semua dimohon untuk berdiri.",
+        ], answer: 1,
+        pembahasan: "'Hadirin' sudah jamak, sehingga 'para/sekalian/semua' mubazir. Kalimat paling efektif: 'Hadirin dimohon berdiri.' Jawaban: B." },
+
+      // ===================== UKMPPD — Ilmu Klinik =====================
+      // ----- Ilmu Penyakit Dalam -----
+      { id: uid(), packageId: ukmppdId, subject: "Ilmu Penyakit Dalam", subtopic: "Endokrin", difficulty: 2,
+        text: "Laki-laki 52 tahun datang dengan poliuria, polidipsia, dan penurunan berat badan. GDP 210 mg/dL dan GD2PP 320 mg/dL. Diagnosis yang paling tepat adalah ...", image: "",
+        options: ["Diabetes melitus tipe 2", "Diabetes insipidus", "Hipertiroid", "Sindrom nefrotik", "Infeksi saluran kemih"], answer: 0,
+        pembahasan: "Trias klasik (poliuria, polidipsia, BB turun) dengan GDP ≥126 dan GD2PP ≥200 menegakkan DM tipe 2. Jawaban: A." },
+      { id: uid(), packageId: ukmppdId, subject: "Ilmu Penyakit Dalam", subtopic: "Gastroenterologi", difficulty: 2,
+        text: "Pasien dengan nyeri ulu hati yang membaik setelah makan dan memburuk saat lapar, paling mungkin mengalami ...", image: "",
+        options: ["Ulkus duodenum", "Ulkus gaster", "Pankreatitis akut", "Kolesistitis", "GERD"], answer: 0,
+        pembahasan: "Nyeri yang mereda dengan makan dan timbul saat lapar khas untuk ulkus duodenum. Jawaban: A." },
+      // ----- Ilmu Kesehatan Anak -----
+      { id: uid(), packageId: ukmppdId, subject: "Ilmu Kesehatan Anak", subtopic: "Respirologi", difficulty: 2,
+        text: "Anak 2 tahun demam, batuk menggonggong, dan stridor inspiratoir. Diagnosis yang paling mungkin adalah ...", image: "",
+        options: ["Croup (laringotrakeobronkitis)", "Bronkiolitis", "Asma", "Pneumonia lobaris", "Epiglotitis"], answer: 0,
+        pembahasan: "Batuk menggonggong (barking cough) + stridor inspiratoir pada balita khas untuk croup. Jawaban: A." },
+      // ----- Kardiologi -----
+      { id: uid(), packageId: ukmppdId, subject: "Kardiologi", subtopic: "Kegawatan", difficulty: 3,
+        text: "Laki-laki 60 tahun nyeri dada menjalar ke lengan kiri sejak 30 menit, EKG menunjukkan elevasi segmen ST di sadapan II, III, aVF. Diagnosis yang paling tepat adalah ...", image: "",
+        options: ["STEMI inferior", "STEMI anterior", "NSTEMI", "Perikarditis", "Angina pektoris stabil"], answer: 0,
+        pembahasan: "Elevasi ST di II, III, aVF menandakan infark dinding inferior → STEMI inferior. Jawaban: A." },
     ],
   };
 }
@@ -1122,6 +1229,7 @@ let _activeQ = null, _tickStart = 0; // pelacakan waktu per soal saat ujian
 const NAV_VIEWS = ["home", "practice", "stats", "input", "bank", "materi", "achievements", "adminresults", "adminusers", "account"];
 const ADMIN_VIEWS = ["input", "bank", "adminusers", "adminresults", "tagbulk"];
 let currentView = "home";
+let homeProgramFilter = ""; // "" = semua program; selain itu = nama program yang dipilih di Beranda
 function setNav(view) {
   document.querySelectorAll(".navbtn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
 }
@@ -1343,11 +1451,31 @@ function renderHome() {
     ]));
   }
 
+  // Filter per program tryout — hanya tampil bila ada >1 program di antara paket.
+  const usedPrograms = [];
+  PROGRAMS.concat([PROGRAM_OTHER]).forEach(pr => {
+    if (store.packages.some(p => programOf(p) === pr)) usedPrograms.push(pr);
+  });
+  if (!usedPrograms.includes(homeProgramFilter)) homeProgramFilter = ""; // reset bila program terpilih hilang
+  if (usedPrograms.length > 1) {
+    const bar = el("div", { class: "pkg-meta", style: "margin-bottom:14px" });
+    const mk = (label, val) => {
+      const active = homeProgramFilter === val;
+      return el("button", { class: "chip" + (active ? " yellow" : ""), style: "cursor:pointer;border:1px solid var(--border)",
+        onclick: () => { homeProgramFilter = val; renderHome(); } }, label);
+    };
+    bar.appendChild(mk("Semua", ""));
+    usedPrograms.forEach(pr => bar.appendChild(mk(pr, pr)));
+    root.appendChild(bar);
+  }
+
+  const visiblePkgs = store.packages.filter(p => !homeProgramFilter || programOf(p) === homeProgramFilter);
   const grid = el("div", { class: "grid" });
-  store.packages.forEach(p => {
+  visiblePkgs.forEach(p => {
     const n = questionsOf(p.id).length;
     const subs = subjectsOf(p.id);
     const meta = [
+      el("span", { class: "chip" }, `🎓 ${programOf(p)}`),
       el("span", { class: "chip yellow" }, `📝 ${n} soal`),
       el("span", { class: "chip" }, `⏱ ${totalMinutes(p)} menit`),
       el("span", { class: "chip" }, p.mode === "sections" ? `🗂 ${subs.length} sesi` : "🕐 timer global"),
@@ -1475,12 +1603,17 @@ function buildPackageSettings(pkg) {
     ]);
   }
 
+  const progSel = el("select", { id: "pkgProgram" },
+    PROGRAMS.map(pr => el("option", { value: pr }, pr)).concat([el("option", { value: "" }, "— Lainnya / belum dikategorikan —")]));
+  progSel.value = PROGRAMS.includes(pkg.program) ? pkg.program : "";
+
   const shufQ = el("input", { type: "checkbox", id: "shufQ" }); if (pkg.shuffleQuestions) shufQ.checked = true;
   const shufO = el("input", { type: "checkbox", id: "shufO" }); if (pkg.shuffleOptions) shufO.checked = true;
 
   return el("div", { class: "card", style: "margin-bottom:18px" }, [
     el("h3", { style: "margin-top:0" }, "⚙️ Pengaturan Paket"),
     field("Nama paket", el("input", { type: "text", id: "pkgName", value: pkg.name })),
+    field("Program tryout", progSel, "kategori paket (mis. SIMAK UI, TOEFL, SBMPTN)"),
     field("Mode waktu", modeSel),
     timingBlock,
     el("div", { class: "field" }, [
@@ -1491,6 +1624,7 @@ function buildPackageSettings(pkg) {
     el("div", { class: "btn-row" }, [
       el("button", { class: "btn sm primary", onclick: () => {
         pkg.name = $("#pkgName").value.trim() || pkg.name;
+        pkg.program = progSel.value;
         if (pkg.mode === "global") pkg.durationMin = Math.max(1, parseInt($("#pkgDur").value) || pkg.durationMin);
         else document.querySelectorAll("[data-subj]").forEach(inp => {
           pkg.sectionMinutes[inp.getAttribute("data-subj")] = Math.max(1, parseInt(inp.value) || DEFAULT_SECTION_MIN);
@@ -1673,7 +1807,7 @@ function renderTagBulk() {
 
 function newPackage() {
   const id = uid();
-  store.packages.push({ id, name: `Paket Baru ${store.packages.length + 1}`, mode: "sections", durationMin: 90, sectionMinutes: {}, shuffleQuestions: true, shuffleOptions: true, createdAt: Date.now() });
+  store.packages.push({ id, name: `Paket Baru ${store.packages.length + 1}`, program: PROGRAMS[0], mode: "sections", durationMin: 90, sectionMinutes: {}, shuffleQuestions: true, shuffleOptions: true, createdAt: Date.now() });
   saveStore(); go("input", id); toast("Paket baru dibuat");
 }
 function deletePackage(pkgId) {
@@ -1813,7 +1947,10 @@ function renderBank() {
     if (qs.length === 0) return;
     const card = el("div", { class: "card", style: "margin-bottom:18px;padding:0" });
     card.appendChild(el("div", { style: "padding:16px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px" }, [
-      el("strong", {}, `${p.name} · ${qs.length} soal · ${totalMinutes(p)} menit`),
+      el("div", {}, [
+        el("span", { class: "chip", style: "margin-right:8px" }, `🎓 ${programOf(p)}`),
+        el("strong", {}, `${p.name} · ${qs.length} soal · ${totalMinutes(p)} menit`),
+      ]),
       el("button", { class: "btn sm primary", onclick: () => startExam(p.id) }, "▶ Tryout"),
     ]));
     qs.forEach((q, i) => card.appendChild(el("div", { class: "bank-item" }, [
@@ -3920,10 +4057,10 @@ function renderAccount() {
 
   const card = el("div", { class: "auth-card" }, [
     el("div", { class: "auth-brand" }, [
-      el("span", { class: "logo" }, "UI"),
+      el("span", { class: "logo" }, "TS"),
       el("div", { class: "auth-brand-text" }, [
-        el("strong", {}, "Tryout SIMAK UI"),
-        el("span", {}, "Pascasarjana"),
+        el("strong", {}, "Tryout Superr"),
+        el("span", {}, "Persiapan ujian"),
       ]),
     ]),
     title,

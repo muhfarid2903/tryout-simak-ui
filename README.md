@@ -1,4 +1,4 @@
-# Tryout SIMAK UI
+# Tryout Superr
 
 Website latihan soal ala SIMAK UI Pascasarjana yang berjalan di browser — mode ujian, analitik, latihan adaptif, dengan akun & sinkron antar perangkat.
 
