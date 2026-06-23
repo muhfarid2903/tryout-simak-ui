@@ -2,7 +2,8 @@
   "packages": [
     {
       "id": "paket-contoh",
-      "name": "Contoh Tryout SIMAK UI — TPA & Bahasa Inggris",
+      "name": "Contoh Tryout — TPA & Bahasa Inggris",
+      "program": "SIMAK UI Pascasarjana",
       "mode": "sections",
       "durationMin": 90,
       "sectionMinutes": {
