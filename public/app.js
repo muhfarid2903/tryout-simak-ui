@@ -13,6 +13,18 @@ const PRESET_SUBJECTS = ["Kemampuan Verbal", "Kemampuan Kuantitatif", "Kemampuan
 const PROGRAMS = ["SIMAK UI", "SIMAK UI Pascasarjana", "TOEFL", "SBMPTN", "UKMPPD (Dokter)"];
 const PROGRAM_OTHER = "Lainnya"; // label untuk paket tanpa program (data lama / impor)
 function programOf(p) { return (p && p.program) ? p.program : PROGRAM_OTHER; }
+
+// Konfigurasi tiap "ruangan" (program) — ikon, deskripsi, & fitur yang ditonjolkan.
+// features.diagnostic: tampilkan Tes Diagnostik (cocok untuk TPA, kurang relevan untuk TOEFL/UKMPPD).
+const ROOMS = {
+  "SIMAK UI":              { icon: "🏛️", blurb: "TPA & Bahasa Inggris ala SIMAK UI",        features: { diagnostic: true } },
+  "SIMAK UI Pascasarjana": { icon: "🎓", blurb: "TPA & Bahasa Inggris untuk seleksi S2/S3", features: { diagnostic: true } },
+  "TOEFL":                 { icon: "🌐", blurb: "Structure, Written Expression & Reading",   features: { diagnostic: false } },
+  "SBMPTN":                { icon: "📚", blurb: "Tes Potensi Skolastik (UTBK)",               features: { diagnostic: true } },
+  "UKMPPD (Dokter)":       { icon: "🩺", blurb: "Ilmu klinik untuk uji kompetensi dokter",    features: { diagnostic: false } },
+};
+const ROOM_OTHER = { icon: "📦", blurb: "Paket lain yang belum dikategorikan", features: { diagnostic: true } };
+function roomConfig(prog) { return ROOMS[prog] || ROOM_OTHER; }
 const DEFAULT_SECTION_MIN = 30;
 const SRS_DAY = 86400000; // 1 hari dalam ms (penjadwalan spaced repetition)
 // Level kesulitan per soal (ditandai admin). null = belum ditandai.
@@ -468,6 +480,7 @@ function normalizeStore(s) {
   if (s.settings.dailyGoal == null) s.settings.dailyGoal = 20;   // target soal per hari
   if (s.settings.dailyGoalType == null) s.settings.dailyGoalType = "count"; // "count" (soal) | "minutes" (menit)
   if (s.settings.dailyGoalMin == null) s.settings.dailyGoalMin = 15;        // target menit per hari
+  if (s.settings.activeProgram == null) s.settings.activeProgram = "";      // ruangan (program) aktif; "" = tampilkan Lobi
   s.calib = s.calib || { sure: { n: 0, correct: 0 }, unsure: { n: 0, correct: 0 }, guess: { n: 0, correct: 0 } };
   if (s._updatedAt == null) s._updatedAt = 0; // penanda versi untuk sinkron antar perangkat
   s.packages.forEach(p => {
@@ -699,6 +712,22 @@ function el(tag, attrs = {}, children = []) {
 }
 function questionsOf(pkgId) { return store.questions.filter(q => q.packageId === pkgId); }
 function pkgById(id) { return store.packages.find(p => p.id === id); }
+
+/* ---------- Ruangan aktif (scoping per program) ----------
+   activeProgram = program yang sedang dibuka. "" = belum memilih (tampilkan Lobi).
+   Semua permukaan belajar (Beranda, Latihan, Statistik, Materi, Bank) membaca
+   roomPackages()/roomQuestions() agar hanya menampilkan isi ruangan tsb. */
+function activeProgram() { return (store.settings && store.settings.activeProgram) || ""; }
+function setActiveProgram(prog) { store.settings.activeProgram = prog || ""; saveStore(); }
+function roomPackages() { const ap = activeProgram(); return ap ? store.packages.filter(p => programOf(p) === ap) : store.packages; }
+function roomPkgIds() { return new Set(roomPackages().map(p => p.id)); }
+function roomQuestions() { const ids = roomPkgIds(); return store.questions.filter(q => ids.has(q.packageId)); }
+// Daftar program yang benar-benar punya paket (untuk Lobi & switcher).
+function availablePrograms() {
+  const out = [];
+  PROGRAMS.concat([PROGRAM_OTHER]).forEach(pr => { if (store.packages.some(p => programOf(p) === pr)) out.push(pr); });
+  return out;
+}
 function subjectsOf(pkgId) {
   const order = [];
   questionsOf(pkgId).forEach(q => { const s = q.subject || "Lainnya"; if (!order.includes(s)) order.push(s); });
@@ -862,14 +891,14 @@ function migrateSrs(st) {
 function isDue(qId) { const st = store.qstats[qId]; return !!(st && st.due != null && st.due <= endOfToday()); }
 // Soal yang sudah pernah dikerjakan & jatuh tempo untuk diulang hari ini (terurut prioritas).
 function dueQuestionIds(pkgId) {
-  return store.questions
+  return roomQuestions()
     .filter(q => (!pkgId || q.packageId === pkgId) && isDue(q.id))
     .map(q => q.id)
     .sort((a, b) => srsPriority(b) - srsPriority(a));
 }
 // Soal yang belum pernah dikerjakan sama sekali.
 function newQuestionIds(pkgId) {
-  return store.questions
+  return roomQuestions()
     .filter(q => (!pkgId || q.packageId === pkgId) && !(store.qstats[q.id] && store.qstats[q.id].seen))
     .map(q => q.id);
 }
@@ -882,7 +911,7 @@ function srsForecast(days = 7) {
     const upper = today + i * SRS_DAY;
     const lower = i === 0 ? -Infinity : today + (i - 1) * SRS_DAY;
     let n = 0;
-    store.questions.forEach(q => {
+    roomQuestions().forEach(q => {
       const st = store.qstats[q.id];
       if (st && st.due != null && st.due > lower && st.due <= upper) n++;
     });
@@ -918,7 +947,7 @@ function computeStreak() {
 // Peta id soal -> subject (untuk agregasi statistik per mata uji).
 function qSubjectMap() {
   const m = {};
-  store.questions.forEach(q => { m[q.id] = q.subject || "Lainnya"; });
+  roomQuestions().forEach(q => { m[q.id] = q.subject || "Lainnya"; });
   return m;
 }
 // Penguasaan per mata uji dari qstats: { subject, attempts, correct, accuracy, avgMs, qCount }
@@ -926,7 +955,7 @@ function subjectMastery() {
   const map = qSubjectMap();
   const agg = {};
   const qBySubj = {};
-  store.questions.forEach(q => { const s = q.subject || "Lainnya"; qBySubj[s] = (qBySubj[s] || 0) + 1; });
+  roomQuestions().forEach(q => { const s = q.subject || "Lainnya"; qBySubj[s] = (qBySubj[s] || 0) + 1; });
   Object.entries(store.qstats).forEach(([qId, st]) => {
     const s = map[qId]; if (!s) return; // soal sudah dihapus
     const a = agg[s] || (agg[s] = { subject: s, attempts: 0, correct: 0, wrong: 0, empty: 0, timeMs: 0, answered: 0 });
@@ -953,7 +982,7 @@ const MIN_SUBTOPIC_ATTEMPTS = 3; // ambang "cukup data" agar akurasi per sub-top
 // { subtopic, answered, correct, accuracy, qCount, byDiff: {1:{a,c},2:{a,c},3:{a,c}} }
 function subtopicMastery(subject) {
   const qBy = {}, qCount = {};
-  store.questions.forEach(q => {
+  roomQuestions().forEach(q => {
     if ((q.subject || "Lainnya") !== subject) return;
     qBy[q.id] = q;
     const k = q.subtopic || "Umum"; qCount[k] = (qCount[k] || 0) + 1;
@@ -1034,12 +1063,12 @@ function srsPriority(qId) {
 }
 // Soal "yakin tapi salah" yang belum dipulihkan (untuk drill khusus & badge).
 function hcMissQuestionIds() {
-  return store.questions.filter(q => { const st = store.qstats[q.id]; return st && st.hcFlag; })
+  return roomQuestions().filter(q => { const st = store.qstats[q.id]; return st && st.hcFlag; })
     .map(q => q.id).sort((a, b) => srsPriority(b) - srsPriority(a));
 }
 // Soal yang masih sering salah / belum dikuasai.
 function weakQuestionIds() {
-  return store.questions.filter(q => {
+  return roomQuestions().filter(q => {
     const st = store.qstats[q.id];
     if (!st || !st.seen) return false;
     return st.lastResult === "wrong" || st.lastResult === "empty" || st.wrong > st.correct;
@@ -1054,7 +1083,7 @@ function isLeech(qId) {
   return fails >= 3 && fails > (st.correct || 0) && st.lastResult !== "correct";
 }
 function leechQuestionIds() {
-  return store.questions.filter(q => isLeech(q.id)).map(q => q.id)
+  return roomQuestions().filter(q => isLeech(q.id)).map(q => q.id)
     .sort((a, b) => srsPriority(b) - srsPriority(a));
 }
 // Interleaving (selang-seling antar mata uji): susun ulang round-robin agar soal dari
@@ -1076,7 +1105,7 @@ function interleaveBySubject(qs) {
 // Dipakai untuk klasifikasi error per-soal. 0 = data referensi belum cukup.
 function subjectTimeRef(subject) {
   const times = [];
-  store.questions.forEach(q => {
+  roomQuestions().forEach(q => {
     if ((q.subject || "Lainnya") !== subject) return;
     const st = store.qstats[q.id];
     if (st && st.seen) times.push(st.timeMs / st.seen);
@@ -1236,13 +1265,17 @@ function setNav(view) {
 function go(view, arg) {
   document.body.classList.remove("auth-screen"); // renderAccount akan menyalakannya lagi bila belum login
   // Wajib login: selain halaman akun, arahkan ke login bila belum masuk.
-  if (!isLoggedIn() && view !== "account") { currentView = "account"; setNav(""); window.scrollTo(0, 0); renderAccount(); return; }
+  if (!isLoggedIn() && view !== "account") { currentView = "account"; setNav(""); updateSidebar(); window.scrollTo(0, 0); renderAccount(); return; }
+  // Wajib pilih ruangan dulu: selain Akun & Lobi, arahkan ke Lobi bila belum memilih program.
+  if (isLoggedIn() && !activeProgram() && view !== "account" && view !== "lobby" && view !== "exam") view = "lobby";
   // Halaman admin hanya untuk admin.
   if (ADMIN_VIEWS.includes(view) && !isAdmin()) { toast("Khusus admin"); view = "home"; }
   currentView = view;
   setNav(NAV_VIEWS.includes(view) ? view : "");
+  updateSidebar();
   window.scrollTo(0, 0);
-  if (view === "home") renderHome();
+  if (view === "lobby") renderLobby();
+  else if (view === "home") renderHome();
   else if (view === "practice") renderPractice(arg);
   else if (view === "stats") renderStats();
   else if (view === "input") renderInput(arg);
@@ -1268,6 +1301,89 @@ document.getElementById("mainnav").addEventListener("click", e => {
   practiceState = null; // keluar dari sesi latihan jika sedang berjalan
   go(btn.dataset.view);
 });
+
+/* =========================================================================
+   RUANGAN: Lobi & sidebar dinamis
+   ========================================================================= */
+// Perbarui header sidebar mengikuti ruangan aktif: logo+nama program, tombol
+// "Ganti ruangan", dan sembunyikan menu nav saat belum memilih ruangan (Lobi).
+function updateSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  if (!sidebar) return;
+  const nav = document.getElementById("mainnav");
+  const brand = sidebar.querySelector(".sidebar-head .brand");
+  const logo = brand.querySelector(".logo");
+  const bt = brand.querySelector(".brand-text");
+  let switchBtn = document.getElementById("roomSwitch");
+  const inRoom = isLoggedIn() && !!activeProgram();
+
+  if (inRoom) {
+    const cfg = roomConfig(activeProgram());
+    logo.textContent = cfg.icon;
+    bt.innerHTML = "";
+    bt.appendChild(el("h1", {}, activeProgram()));
+    bt.appendChild(el("span", { class: "brand-sub" }, "Ruangan belajar"));
+    if (nav) nav.style.display = "";
+    if (!switchBtn && nav) {
+      switchBtn = el("button", { id: "roomSwitch", class: "room-switch", onclick: () => go("lobby") }, "⇄ Ganti ruangan");
+      nav.parentNode.insertBefore(switchBtn, nav);
+    }
+    if (switchBtn) switchBtn.style.display = "";
+  } else {
+    logo.textContent = "TS";
+    bt.innerHTML = "";
+    bt.appendChild(el("h1", {}, "Tryout Superr"));
+    if (nav) nav.style.display = "none";
+    if (switchBtn) switchBtn.style.display = "none";
+  }
+}
+
+// Masuk ke sebuah ruangan (program) lalu buka Beranda ruangan tsb.
+function enterRoom(prog) {
+  setActiveProgram(prog);
+  homeProgramFilter = "";
+  go("home");
+}
+
+// Lobi: pilih program/"ruangan" yang ingin dipelajari.
+function renderLobby() {
+  const root = app();
+  root.innerHTML = "";
+  root.appendChild(el("h2", { class: "page-title" }, "Mau belajar apa hari ini?"));
+  root.appendChild(el("p", { class: "lobby-intro" }, "Pilih ruangan belajar. Setiap ruangan menampilkan paket, latihan, statistik, dan materinya sendiri."));
+
+  const progs = availablePrograms();
+  if (progs.length === 0) {
+    root.appendChild(isAdmin()
+      ? emptyState("📦", "Belum ada paket", "Buat paket & soal di menu Input Soal (akan muncul sebagai ruangan di sini).",
+          el("button", { class: "btn primary", onclick: () => { setActiveProgram(PROGRAMS[0]); go("input"); } }, "+ Buat Paket"))
+      : emptyState("📦", "Belum ada ruangan", "Admin belum mengunggah paket soal. Cek lagi nanti ya."));
+    return;
+  }
+
+  const grid = el("div", { class: "grid lobby-grid" });
+  progs.forEach(prog => {
+    const cfg = roomConfig(prog);
+    const pkgs = store.packages.filter(p => programOf(p) === prog);
+    const nPkg = pkgs.length;
+    const nQ = store.questions.filter(q => pkgs.some(p => p.id === q.packageId)).length;
+    // progres ringkas: rekor terbaik di antara paket ruangan ini
+    const recs = pkgs.map(p => store.records[p.id]).filter(r => r && r.best);
+    const bestPct = recs.length ? Math.max(...recs.map(r => r.best.pct)) : null;
+    grid.appendChild(el("div", { class: "card room-card", onclick: () => enterRoom(prog) }, [
+      el("div", { class: "room-icon" }, cfg.icon),
+      el("h3", {}, prog),
+      el("p", { class: "room-blurb" }, cfg.blurb),
+      el("div", { class: "pkg-meta" }, [
+        el("span", { class: "chip yellow" }, `📦 ${nPkg} paket`),
+        el("span", { class: "chip" }, `📝 ${nQ} soal`),
+        bestPct != null ? el("span", { class: "chip record" }, `🏅 ${bestPct}%`) : null,
+      ]),
+      el("button", { class: "btn primary", style: "margin-top:auto", onclick: (e) => { e.stopPropagation(); enterRoom(prog); } }, "Masuk ruangan →"),
+    ]));
+  });
+  root.appendChild(grid);
+}
 
 /* =========================================================================
    VIEW: HOME
@@ -1385,21 +1501,24 @@ function dailyGoalCard() {
 function renderHome() {
   const root = app();
   root.innerHTML = "";
-  root.appendChild(el("h2", { class: "page-title" }, "Paket Tryout"));
+  const cfg = roomConfig(activeProgram());
+  const roomQs = roomQuestions();
+  root.appendChild(el("h2", { class: "page-title" }, `${cfg.icon} ${activeProgram()}`));
 
-  if (store.packages.length === 0) {
+  if (roomPackages().length === 0) {
     root.appendChild(isAdmin()
-      ? emptyState("📦", "Belum ada paket tryout", "Buat paket dan soalnya di menu Input Soal.",
+      ? emptyState("📦", "Ruangan ini masih kosong", "Buat paket untuk program ini di menu Input Soal.",
           el("button", { class: "btn primary", onclick: () => go("input") }, "+ Buat Paket"))
-      : emptyState("📦", "Belum ada paket tryout", "Admin belum mengunggah paket soal. Cek lagi nanti ya."));
+      : emptyState("📦", "Ruangan ini masih kosong", "Admin belum mengunggah paket untuk program ini. Coba ruangan lain.",
+          el("button", { class: "btn", onclick: () => go("lobby") }, "⇄ Ganti ruangan")));
     return;
   }
 
   // Target belajar harian (cincin progres).
   root.appendChild(dailyGoalCard());
 
-  // Tes Diagnostik (cold-start): titik masuk menonjol bila belum pernah & bank cukup besar.
-  if (store.questions.length >= 8 && !store.settings.diagnosticDoneAt) {
+  // Tes Diagnostik (cold-start): hanya untuk ruangan yang relevan (mis. TPA), bila bank cukup besar.
+  if (cfg.features.diagnostic && roomQs.length >= 8 && !store.settings.diagnosticDoneAt) {
     root.appendChild(el("div", { class: "focus-banner", style: "margin-bottom:14px" }, [
       el("span", { class: "rb-icon" }, "📋"),
       el("div", { style: "flex:1" }, [
@@ -1411,7 +1530,7 @@ function renderHome() {
   }
 
   // Pelatih: pointer ke Rencana Hari Ini (PR1) — muncul bila sudah ada data latihan.
-  if (store.questions.length && Object.values(store.qstats).reduce((a, s) => a + (s.seen || 0), 0) > 0) {
+  if (roomQs.length && Object.values(store.qstats).reduce((a, s) => a + (s.seen || 0), 0) > 0) {
     const nActs = coachActions().length;
     const dleft = daysUntilExam();
     root.appendChild(el("div", { class: "focus-banner", style: "margin-bottom:14px" }, [
@@ -1426,7 +1545,7 @@ function renderHome() {
   }
 
   // Sesi kilat untuk pengguna sibuk: 7 soal prioritas (jatuh tempo + bandel + terlemah).
-  if (store.questions.length) {
+  if (roomQs.length) {
     root.appendChild(el("div", { class: "focus-banner", style: "margin-bottom:14px" }, [
       el("span", { class: "rb-icon" }, "⚡"),
       el("div", { style: "flex:1" }, [
@@ -1451,31 +1570,12 @@ function renderHome() {
     ]));
   }
 
-  // Filter per program tryout — hanya tampil bila ada >1 program di antara paket.
-  const usedPrograms = [];
-  PROGRAMS.concat([PROGRAM_OTHER]).forEach(pr => {
-    if (store.packages.some(p => programOf(p) === pr)) usedPrograms.push(pr);
-  });
-  if (!usedPrograms.includes(homeProgramFilter)) homeProgramFilter = ""; // reset bila program terpilih hilang
-  if (usedPrograms.length > 1) {
-    const bar = el("div", { class: "pkg-meta", style: "margin-bottom:14px" });
-    const mk = (label, val) => {
-      const active = homeProgramFilter === val;
-      return el("button", { class: "chip" + (active ? " yellow" : ""), style: "cursor:pointer;border:1px solid var(--border)",
-        onclick: () => { homeProgramFilter = val; renderHome(); } }, label);
-    };
-    bar.appendChild(mk("Semua", ""));
-    usedPrograms.forEach(pr => bar.appendChild(mk(pr, pr)));
-    root.appendChild(bar);
-  }
-
-  const visiblePkgs = store.packages.filter(p => !homeProgramFilter || programOf(p) === homeProgramFilter);
+  root.appendChild(el("h3", { class: "section-title", style: "margin:18px 0 10px" }, "Paket di ruangan ini"));
   const grid = el("div", { class: "grid" });
-  visiblePkgs.forEach(p => {
+  roomPackages().forEach(p => {
     const n = questionsOf(p.id).length;
     const subs = subjectsOf(p.id);
     const meta = [
-      el("span", { class: "chip" }, `🎓 ${programOf(p)}`),
       el("span", { class: "chip yellow" }, `📝 ${n} soal`),
       el("span", { class: "chip" }, `⏱ ${totalMinutes(p)} menit`),
       el("span", { class: "chip" }, p.mode === "sections" ? `🗂 ${subs.length} sesi` : "🕐 timer global"),
@@ -1807,7 +1907,7 @@ function renderTagBulk() {
 
 function newPackage() {
   const id = uid();
-  store.packages.push({ id, name: `Paket Baru ${store.packages.length + 1}`, program: PROGRAMS[0], mode: "sections", durationMin: 90, sectionMinutes: {}, shuffleQuestions: true, shuffleOptions: true, createdAt: Date.now() });
+  store.packages.push({ id, name: `Paket Baru ${store.packages.length + 1}`, program: activeProgram() || PROGRAMS[0], mode: "sections", durationMin: 90, sectionMinutes: {}, shuffleQuestions: true, shuffleOptions: true, createdAt: Date.now() });
   saveStore(); go("input", id); toast("Paket baru dibuat");
 }
 function deletePackage(pkgId) {
@@ -1936,19 +2036,19 @@ function distractorBlock(q) {
 function renderBank() {
   const root = app();
   root.innerHTML = "";
-  root.appendChild(el("h2", { class: "page-title" }, "Bank Soal"));
-  if (store.questions.length === 0) {
-    root.appendChild(emptyState("🗂", "Bank soal kosong", "Tambahkan soal lewat menu Input Soal.",
-      el("button", { class: "btn primary", onclick: () => go("input") }, "Input Soal")));
+  root.appendChild(el("h2", { class: "page-title" }, `Bank Soal · ${activeProgram()}`));
+  if (roomQuestions().length === 0) {
+    root.appendChild(emptyState("🗂", "Bank soal ruangan ini kosong", "Belum ada soal untuk program ini.",
+      isAdmin() ? el("button", { class: "btn primary", onclick: () => go("input") }, "Input Soal")
+                : el("button", { class: "btn", onclick: () => go("lobby") }, "⇄ Ganti ruangan")));
     return;
   }
-  store.packages.forEach(p => {
+  roomPackages().forEach(p => {
     const qs = questionsOf(p.id);
     if (qs.length === 0) return;
     const card = el("div", { class: "card", style: "margin-bottom:18px;padding:0" });
     card.appendChild(el("div", { style: "padding:16px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px" }, [
       el("div", {}, [
-        el("span", { class: "chip", style: "margin-right:8px" }, `🎓 ${programOf(p)}`),
         el("strong", {}, `${p.name} · ${qs.length} soal · ${totalMinutes(p)} menit`),
       ]),
       el("button", { class: "btn sm primary", onclick: () => startExam(p.id) }, "▶ Tryout"),
@@ -1974,7 +2074,7 @@ function renderBank() {
    ========================================================================= */
 function subjectCounts() {
   const counts = {};
-  store.questions.forEach(q => { const s = q.subject || "Lainnya"; counts[s] = (counts[s] || 0) + 1; });
+  roomQuestions().forEach(q => { const s = q.subject || "Lainnya"; counts[s] = (counts[s] || 0) + 1; });
   return counts;
 }
 
@@ -2134,7 +2234,7 @@ function achievementsBody(root) {
   ]));
 
   // ----- Rekor per paket -----
-  const recEntries = store.packages.filter(p => store.records[p.id] && store.records[p.id].best);
+  const recEntries = roomPackages().filter(p => store.records[p.id] && store.records[p.id].best);
   if (recEntries.length === 0) {
     root.appendChild(el("div", { class: "note" }, "Belum ada rekor. Selesaikan sebuah tryout di Beranda untuk mencatat skor tertinggi pertamamu."));
   } else {
@@ -2846,7 +2946,7 @@ function coachActions() {
   const sumSeen = Object.values(store.qstats).reduce((a, s) => a + (s.seen || 0), 0);
 
   if (sumSeen === 0) { // cold start → arahkan ke titik mulai
-    if (store.questions.length >= 8 && !store.settings.diagnosticDoneAt)
+    if (roomConfig(activeProgram()).features.diagnostic && roomQuestions().length >= 8 && !store.settings.diagnosticDoneAt)
       out.push({ icon: "📋", title: "Tes Diagnostik", reason: "Belum ada data — mulai dari sini agar pelatih tahu kelemahanmu.", minutes: 15, run: () => startPractice("diagnostic", { title: "Tes Diagnostik" }) });
     else
       out.push({ icon: "✨", title: "Coba soal baru", reason: "Kerjakan beberapa soal dulu agar pelatih bisa menyusun rencana.", minutes: estMin(10), run: () => startPractice("new", { title: "Soal baru" }) });
@@ -3002,7 +3102,7 @@ function coachPanel() {
 function isMasteredQ(id) { const st = store.qstats[id]; return !!(st && (st.reps || 0) >= 2 && st.lastResult === "correct"); }
 function bankCoverage() {
   const agg = {};
-  store.questions.forEach(q => {
+  roomQuestions().forEach(q => {
     const s = q.subject || "Lainnya";
     const a = agg[s] || (agg[s] = { subject: s, total: 0, attempted: 0, mastered: 0 });
     a.total++;
@@ -3066,7 +3166,7 @@ function managerCards() {
 function renderStats() {
   const root = app();
   root.innerHTML = "";
-  root.appendChild(el("h2", { class: "page-title" }, "Statistik Belajar"));
+  root.appendChild(el("h2", { class: "page-title" }, `Statistik Belajar · ${activeProgram()}`));
 
   // Tab: Statistik | Jurnal Kesalahan | Pencapaian (dilebur ke sini agar sidebar ramping).
   root.appendChild(el("div", { class: "materi-tabs" }, [
@@ -3077,8 +3177,9 @@ function renderStats() {
   if (statsTab === "achievements") { achievementsBody(root); return; }
   if (statsTab === "journal") { journalBody(root); return; }
 
-  const totalAttempts = Object.values(store.records).reduce((a, r) => a + (r.attempts || 0), 0);
-  const qstatVals = Object.values(store.qstats);
+  const roomQIds = new Set(roomQuestions().map(q => q.id));
+  const totalAttempts = roomPackages().reduce((a, p) => a + ((store.records[p.id] && store.records[p.id].attempts) || 0), 0);
+  const qstatVals = Object.entries(store.qstats).filter(([id]) => roomQIds.has(id)).map(([, s]) => s);
   const sumSeen = qstatVals.reduce((a, s) => a + s.seen, 0);
   const sumCorrect = qstatVals.reduce((a, s) => a + s.correct, 0);
   const sumAnswered = qstatVals.reduce((a, s) => a + s.correct + s.wrong, 0);
@@ -3247,7 +3348,7 @@ function renderStats() {
   }
 
   // ----- Tren skor per paket -----
-  store.packages.forEach(p => {
+  roomPackages().forEach(p => {
     const rec = store.records[p.id];
     if (!rec || !rec.history || !rec.history.length) return;
     const h = rec.history;
@@ -3318,11 +3419,13 @@ function renderPractice() {
   if (practiceState) return renderPracticeSession();
   const root = app();
   root.innerHTML = "";
-  root.appendChild(el("h2", { class: "page-title" }, "Latihan Soal"));
+  root.appendChild(el("h2", { class: "page-title" }, `Latihan Soal · ${activeProgram()}`));
 
-  if (!store.questions.length) {
-    root.appendChild(emptyState("📚", "Belum ada soal", "Tambahkan soal di menu Input Soal dulu.",
-      el("button", { class: "btn primary", onclick: () => go("input") }, "+ Input Soal")));
+  const roomQs = roomQuestions();
+  if (!roomQs.length) {
+    root.appendChild(emptyState("📚", "Belum ada soal di ruangan ini", "Belum ada soal untuk program ini.",
+      isAdmin() ? el("button", { class: "btn primary", onclick: () => go("input") }, "+ Input Soal")
+                : el("button", { class: "btn", onclick: () => go("lobby") }, "⇄ Ganti ruangan")));
     return;
   }
 
@@ -3351,26 +3454,26 @@ function renderPractice() {
   const newN = newQuestionIds().length;
   const leechN = leechQuestionIds().length;
   const hcN = hcMissQuestionIds().length;
-  const taggedN = store.questions.filter(q => DIFFICULTY_LEVELS.includes(q.difficulty)).length;
+  const taggedN = roomQs.filter(q => DIFFICULTY_LEVELS.includes(q.difficulty)).length;
   const grid = el("div", { class: "grid" }, [
-    store.questions.length >= 8 ? practiceCard("📋", "Tes Diagnostik", store.settings.diagnosticDoneAt ? "ukur ulang kelemahan lintas mata uji" : "ukur kelemahan lintas mata uji", false, () => startPractice("diagnostic", { title: "Tes Diagnostik" })) : null,
+    (roomConfig(activeProgram()).features.diagnostic && roomQs.length >= 8) ? practiceCard("📋", "Tes Diagnostik", store.settings.diagnosticDoneAt ? "ukur ulang kelemahan lintas mata uji" : "ukur kelemahan lintas mata uji", false, () => startPractice("diagnostic", { title: "Tes Diagnostik" })) : null,
     practiceCard("⚡", "Review 5 menit", "sesi kilat · 7 soal prioritas", false, () => startPractice("micro", { title: "Review 5 menit" })),
     practiceCard("📅", "Review hari ini", dueN ? `${dueN} soal jatuh tempo` : "tidak ada yang jatuh tempo", dueN === 0, () => startPractice("due", { title: "Review hari ini" })),
     hcN ? practiceCard("⚠️", "Yakin tapi salah", `${hcN} soal · kamu yakin tapi keliru — paling penting dikoreksi`, false, () => startPractice("hcmiss", { title: "Yakin tapi salah" })) : null,
     practiceCard("🎯", "Soal yang salah", `${wrongN} soal perlu diulang`, wrongN === 0, () => startPractice("wrong", { title: "Soal yang salah" })),
     leechN ? practiceCard("🧯", "Soal bandel", `${leechN} soal sering salah · baca materi`, false, () => startPractice("leech", { title: "Soal bandel" })) : null,
     practiceCard("★", "Soal ditandai", `${bmN} soal di-bookmark`, bmN === 0, () => startPractice("bookmark", { title: "Soal ditandai" })),
-    practiceCard("🔀", "Campur cerdas", `${store.questions.length} soal · prioritas SRS`, false, () => startPractice("mix", { title: "Campur cerdas" })),
+    practiceCard("🔀", "Campur cerdas", `${roomQs.length} soal · prioritas SRS`, false, () => startPractice("mix", { title: "Campur cerdas" })),
     taggedN >= 4 ? practiceCard("🪜", "Tangga kesulitan", "mudah → sulit, menyesuaikan jawabanmu", false, () => startPractice("ladder", { title: "Tangga kesulitan" })) : null,
     practiceCard("✨", "Soal baru", newN ? `${newN} soal belum dicoba` : "semua sudah dicoba", newN === 0, () => startPractice("new", { title: "Soal baru" })),
   ]);
   root.appendChild(grid);
 
   root.appendChild(el("h3", { style: "margin-top:22px" }, "Latihan per Mata Uji"));
-  const subjects = [...new Set(store.questions.map(q => q.subject || "Lainnya"))];
+  const subjects = [...new Set(roomQs.map(q => q.subject || "Lainnya"))];
   const sg = el("div", { class: "grid" });
   subjects.forEach(s => {
-    const n = store.questions.filter(q => (q.subject || "Lainnya") === s).length;
+    const n = roomQs.filter(q => (q.subject || "Lainnya") === s).length;
     sg.appendChild(practiceCard("📚", s, `${n} soal`, n === 0, () => startPractice("subject", { subject: s, title: "Latihan " + s })));
   });
   root.appendChild(sg);
@@ -3406,7 +3509,7 @@ function ladderAdjust(ok) {
 function startLadder(opts) {
   const inScope = q => !opts.subject || (q.subject || "Lainnya") === opts.subject;
   const buckets = { 1: [], 2: [], 3: [] };
-  store.questions.forEach(q => { if (inScope(q) && DIFFICULTY_LEVELS.includes(q.difficulty)) buckets[q.difficulty].push(q); });
+  roomQuestions().forEach(q => { if (inScope(q) && DIFFICULTY_LEVELS.includes(q.difficulty)) buckets[q.difficulty].push(q); });
   const totalTagged = buckets[1].length + buckets[2].length + buckets[3].length;
   if (totalTagged < 4) { toast("Belum cukup soal ber-level untuk mode tangga — tandai kesulitan soal dulu."); return; }
   DIFFICULTY_LEVELS.forEach(v => buckets[v].sort((a, b) => srsPriority(b.id) - srsPriority(a.id))); // lemah/baru dulu
@@ -3438,12 +3541,13 @@ function practiceAtEnd() {
 // yang belum pernah dikerjakan, dibatasi ~perSubject/mata uji agar singkat. Testing/pre-testing
 // effect: mengukur sekaligus mulai belajar & menyemai data (SRS/qstats) sejak menit pertama.
 function diagnosticQuestionIds(perSubject = 5) {
-  const subjects = [...new Set(store.questions.map(q => q.subject || "Lainnya"))];
+  const pool = roomQuestions();
+  const subjects = [...new Set(pool.map(q => q.subject || "Lainnya"))];
   const seenOf = id => (store.qstats[id] && store.qstats[id].seen) || 0;
   const out = [];
   subjects.forEach(s => {
     const byd = { 1: [], 2: [], 3: [], 0: [] };
-    store.questions.forEach(q => { if ((q.subject || "Lainnya") === s) byd[DIFFICULTY_LEVELS.includes(q.difficulty) ? q.difficulty : 0].push(q); });
+    pool.forEach(q => { if ((q.subject || "Lainnya") === s) byd[DIFFICULTY_LEVELS.includes(q.difficulty) ? q.difficulty : 0].push(q); });
     const rank = arr => arr.slice().sort((a, b) => (seenOf(a.id) - seenOf(b.id)) || (srsPriority(b.id) - srsPriority(a.id))); // belum pernah dulu
     const sorted = { 1: rank(byd[1]), 2: rank(byd[2]), 3: rank(byd[3]), 0: rank(byd[0]) };
     const cur = { 1: 0, 2: 0, 3: 0, 0: 0 }, picks = [];
@@ -3462,9 +3566,11 @@ function diagnosticQuestionIds(perSubject = 5) {
 function startPractice(mode, opts = {}) {
   if (mode === "ladder") { startLadder(opts); return; }
   const byId = {}; store.questions.forEach(q => byId[q.id] = q);
+  const roomIds = roomPkgIds();
+  const inRoom = id => byId[id] && roomIds.has(byId[id].packageId);
   let ids;
   if (mode === "wrong") ids = weakQuestionIds();
-  else if (mode === "bookmark") ids = Object.keys(store.bookmarks);
+  else if (mode === "bookmark") ids = Object.keys(store.bookmarks).filter(inRoom);
   else if (mode === "due") ids = dueQuestionIds();
   else if (mode === "new") ids = newQuestionIds();
   else if (mode === "leech") ids = leechQuestionIds();
@@ -3475,13 +3581,13 @@ function startPractice(mode, opts = {}) {
     if (set.size < 7) for (const id of newQuestionIds()) { set.add(id); if (set.size >= 7) break; }
     ids = [...set];
   }
-  else if (mode === "subject") ids = store.questions.filter(q => (q.subject || "Lainnya") === opts.subject).map(q => q.id);
-  else if (mode === "subtopic") ids = store.questions.filter(q =>
+  else if (mode === "subject") ids = roomQuestions().filter(q => (q.subject || "Lainnya") === opts.subject).map(q => q.id);
+  else if (mode === "subtopic") ids = roomQuestions().filter(q =>
     (q.subject || "Lainnya") === opts.subject && (q.subtopic || "Umum") === opts.subtopic &&
     (opts.difficulty == null || q.difficulty === opts.difficulty)).map(q => q.id);
-  else if (mode === "weakness") { const subs = new Set(weakestSubjects(3)); ids = store.questions.filter(q => subs.has(q.subject || "Lainnya")).map(q => q.id); }
+  else if (mode === "weakness") { const subs = new Set(weakestSubjects(3)); ids = roomQuestions().filter(q => subs.has(q.subject || "Lainnya")).map(q => q.id); }
   else if (mode === "diagnostic") ids = diagnosticQuestionIds();
-  else ids = store.questions.map(q => q.id);
+  else ids = roomQuestions().map(q => q.id);
 
   let qs = ids.map(id => byId[id]).filter(Boolean);
   if (!qs.length) {
@@ -3952,7 +4058,12 @@ async function pushContent() {
   } catch (e) { handleAuthErr(e); }
 }
 
-function refreshView() { if (!examState) go(currentView || "home"); }
+function refreshView() {
+  if (examState) return;
+  // Setelah sinkron: bila ruangan sudah dipilih (mis. dari perangkat lain) tapi masih di Lobi, masuk ke ruangan.
+  if (currentView === "lobby" && activeProgram()) { go("home"); return; }
+  go(currentView || "home");
+}
 
 // Tarik konten pusat + progres user dari server, terapkan ke store.
 async function syncOnLogin({ silent = false } = {}) {
