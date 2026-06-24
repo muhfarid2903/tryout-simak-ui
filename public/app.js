@@ -1924,13 +1924,32 @@ function exportJSON() {
   const a = el("a", { href: URL.createObjectURL(blob), download: "tryout-simak-ui.json" });
   document.body.appendChild(a); a.click(); a.remove(); toast("Data diekspor");
 }
-// Gabungkan data import ke store yang ada (id paket & soal dibuat ulang agar tidak bentrok)
+// Gabungkan data import ke store yang ada.
+// Paket digabung (soal ditambahkan ke paket yang ada) bila `id` yang ditulis di file
+// cocok dengan paket yang sudah ada, ATAU nama+program-nya sama — sehingga batch
+// soal (mis. per mata uji, dengan id paket yang sama) menyatu jadi SATU paket.
+// Bila tak ada yang cocok, paket dibuat baru (id dari file dipertahankan bila belum
+// dipakai paket lain, selain itu diberi id unik agar tak bentrok).
 function mergeImported(data) {
   const idMap = {};
-  data.packages.forEach(p => { const newId = uid(); idMap[p.id] = newId; p.id = newId; });
-  const fallback = data.packages[0] ? data.packages[0].id : null;
+  const firstOrigId = data.packages[0] ? data.packages[0].id : null;
+  data.packages.forEach(p => {
+    const origId = p.id;
+    const existing = store.packages.find(x => x.id === origId)
+      || store.packages.find(x => x.name === p.name && (x.program || "") === (p.program || ""));
+    if (existing) {
+      idMap[origId] = existing.id; // gabung ke paket yang sudah ada
+      // Lengkapi durasi per mata uji yang belum ada di paket tujuan.
+      if (p.sectionMinutes) for (const [k, v] of Object.entries(p.sectionMinutes))
+        if (existing.sectionMinutes[k] == null) existing.sectionMinutes[k] = v;
+    } else {
+      const newId = (origId && !store.packages.some(x => x.id === origId)) ? origId : uid();
+      p.id = newId; idMap[origId] = newId;
+      store.packages.push(p);
+    }
+  });
+  const fallback = idMap[firstOrigId] || (store.packages[0] && store.packages[0].id) || null;
   data.questions.forEach(q => { q.id = uid(); q.packageId = idMap[q.packageId] || fallback; });
-  store.packages.push(...data.packages);
   store.questions.push(...data.questions);
 }
 
