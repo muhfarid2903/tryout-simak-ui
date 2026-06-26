@@ -2593,9 +2593,12 @@ function renderQuestion() {
   main.innerHTML = "";
 
   const card = el("div", { class: "card" }, [
-    el("div", { class: "q-meta" }, [
-      el("span", {}, `Soal ${i + 1} dari ${sec.questions.length}`),
-      q.subject ? el("span", { class: "tag", style: "margin-left:8px" }, q.subject) : null,
+    el("div", { class: "q-head" }, [
+      el("span", { class: "q-no" }, String(i + 1)),
+      el("div", { class: "q-head-meta" }, [
+        el("span", { class: "q-no-label" }, `Soal ${i + 1} / ${sec.questions.length}`),
+        q.subject ? el("span", { class: "tag" }, q.subject) : null,
+      ]),
     ]),
     mathText("div", "q-text", q.text),
     q.image ? el("img", { class: "q-img", src: q.image, alt: "gambar soal", onerror: function () { this.style.display = "none"; } }) : null,
