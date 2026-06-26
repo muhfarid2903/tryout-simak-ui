@@ -2458,6 +2458,7 @@ function advanceSection() {
 function renderExam() {
   const root = app();
   root.innerHTML = "";
+  document.body.classList.remove("exam-nav-open"); // mulai bersih (drawer tertutup)
   const s = examState;
   const sec = curSec();
   const isSections = s.mode === "sections";
@@ -2469,7 +2470,10 @@ function renderExam() {
 
   root.appendChild(el("div", { class: "exam-header" }, [
     el("div", {}, titleBits),
-    el("div", { class: "timer", id: "timer" }, "--:--"),
+    el("div", { style: "display:flex;align-items:center;gap:10px" }, [
+      el("button", { class: "btn sm exam-nav-toggle", onclick: () => document.body.classList.toggle("exam-nav-open") }, "☰ Navigasi"),
+      el("div", { class: "timer", id: "timer" }, "--:--"),
+    ]),
   ]));
 
   if (isSections) root.appendChild(el("div", { class: "note", style: "margin-bottom:14px" },
@@ -2499,8 +2503,9 @@ function renderExam() {
   sideChildren.push(el("button", { class: "btn dark", style: "width:100%", onclick: confirmFinishSection },
     isSections && !lastSection ? "Selesaikan Sesi →" : "Selesai & Lihat Hasil"));
 
-  layout.appendChild(el("div", {}, [el("div", { class: "card sidebar-card" }, sideChildren)]));
+  layout.appendChild(el("div", { class: "exam-side" }, [el("div", { class: "card sidebar-card" }, sideChildren)]));
   root.appendChild(layout);
+  root.appendChild(el("div", { class: "exam-nav-backdrop", onclick: () => document.body.classList.remove("exam-nav-open") }));
 
   renderQuestion();
   startTimer();
@@ -2561,7 +2566,7 @@ function updateNav() {
     if (sec.answers[i] !== null) cls += " answered";
     if (sec.flags[i]) cls += " flagged";
     if (i === examState.qi) cls += " current";
-    grid.appendChild(el("button", { class: cls, onclick: () => { examState.qi = i; renderQuestion(); updateNav(); } }, String(i + 1)));
+    grid.appendChild(el("button", { class: cls, onclick: () => { examState.qi = i; document.body.classList.remove("exam-nav-open"); renderQuestion(); updateNav(); } }, String(i + 1)));
   });
 }
 function updateProgress() {
@@ -2740,13 +2745,13 @@ function renderResult(r) {
   // Tindak lanjut: latih soal yang salah & lihat statistik
   if (r.wrong > 0 || r.empty > 0) {
     root.appendChild(el("div", { class: "btn-row", style: "margin:0 0 18px" }, [
-      el("button", { class: "btn", onclick: () => startPractice("wrong", { title: "Ulang soal yang salah" }) }, "🎯 Latih soal yang salah"),
+      el("button", { class: "btn primary", onclick: () => startPractice("wrong", { title: "Ulang soal yang salah" }) }, "🎯 Latih soal yang salah"),
       el("button", { class: "btn", onclick: () => go("stats") }, "📊 Lihat statistik"),
     ]));
   }
 
   const actions = () => el("div", { class: "btn-row", style: "margin:0 0 22px" }, [
-    el("button", { class: "btn primary", onclick: () => startExam(r.pkgId) }, "🔁 Ulangi Tryout"),
+    el("button", { class: "btn", onclick: () => startExam(r.pkgId) }, "🔁 Ulangi Tryout"),
     el("button", { class: "btn", onclick: () => go("home") }, "Kembali ke Beranda"),
   ]);
   root.appendChild(actions());
