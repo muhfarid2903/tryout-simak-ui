@@ -6,6 +6,10 @@ antara `=== MULAI PROMPT ===` dan `=== AKHIR PROMPT ===` ke LLM yang kuat
 (Claude/GPT), ubah bagian **PARAMETER** bila perlu, lalu import hasil JSON-nya
 lewat **Input Soal → ⬆ Import** (pilih *Tambahkan* agar tergabung).
 
+> **Mau tinggal copy-paste tanpa edit?** Lihat [per-subtes.md](per-subtes.md) —
+> prompt **siap pakai per subtes** dengan **jumlah soal sudah terisi** untuk
+> semua paket.
+
 | Program (ruangan)        | File                                   |
 |--------------------------|----------------------------------------|
 | SIMAK UI (Sarjana)       | [simak-ui.md](simak-ui.md)             |
