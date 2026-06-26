@@ -12,6 +12,29 @@ Aturan umum yang sudah dibakukan di tiap blok:
 - Semua blok dalam satu program memakai **`id` paket yang sama** → import *Tambahkan* menyatukannya jadi satu paket.
 - Untuk menambah soal, **jalankan blok yang sama berkali-kali** (id tetap) sampai target tercapai.
 
+### Aturan penamaan paket (kapan menyatu vs terpisah)
+
+Sistem menganggap dua paket **sama (soal digabung)** bila **`id` sama _ATAU_ `name`+`program` sama**. Konsekuensinya:
+
+- **Menambah soal ke paket yang sama** → buat `id` **dan** `name` **sama persis** di semua blok (jalankan blok berkali-kali).
+- **Membuat paket tryout baru yang terpisah** → buat `id` **BEDA dan** `name` **BEDA**. (Cukup salah satu beda, tapi paling aman bedakan keduanya.)
+
+> ⚠️ Sering keliru: menyalin paket lalu hanya mengganti `id` tetapi `name` tetap sama → tetap **tergabung**, karena `name`+`program` masih cocok.
+
+**Pola penomoran** — `program` selalu tetap (mis. `"SIMAK UI"`); yang dinaikkan hanya `id` & `name`:
+
+| Paket | `id` | `name` |
+|---|---|---|
+| KD Paket 1 | `simak-ui-kd-01` | `Tryout SIMAK UI — Kemampuan Dasar Paket 1` |
+| KD Paket 2 | `simak-ui-kd-02` | `Tryout SIMAK UI — Kemampuan Dasar Paket 2` |
+| KD Paket 3 | `simak-ui-kd-03` | `Tryout SIMAK UI — Kemampuan Dasar Paket 3` |
+| IPA Paket 2 | `simak-ui-ipa-02` | `Tryout SIMAK UI — IPA Paket 2` |
+
+Dalam **satu** paket, 3 hal ini wajib sama persis di semua blok yang dijalankan untuk paket itu:
+1. `id` paket · 2. `name` paket · 3. `packageId` di **setiap** soal (= `id` paket tsb).
+
+Saat menaikkan nomor paket (`-01` → `-02`, `Paket 1` → `Paket 2`), **ganti ketiganya sekaligus**.
+
 Daftar isi:
 1. [SIMAK UI Pascasarjana](#1-simak-ui-pascasarjana) — 4 subtes
 2. [SIMAK UI (Sarjana)](#2-simak-ui-sarjana) — Kemampuan Dasar / IPA / IPS
@@ -25,13 +48,15 @@ Daftar isi:
 
 `id` paket: **`simak-pasca-01`** · Target akhir ±360 soal (Verbal 90 · Kuantitatif 105 · Penalaran 75 · Inggris 90). Tiap blok = 25 soal; ulangi sampai target.
 
+> Untuk paket tryout berikutnya yang **terpisah**, naikkan nomornya: `id` → `simak-pasca-02` dan `name` → `… Paket 2` (lihat [Aturan penamaan paket](#aturan-penamaan-paket-kapan-menyatu-vs-terpisah)).
+
 ### 1a. Kemampuan Verbal — 25 soal
 
 === MULAI PROMPT ===
 Kamu penyusun soal **SIMAK UI Pascasarjana (TPA)** ahli pedagogi & psikometri. Buat **25 soal** subtes **"Kemampuan Verbal"** sebagai **JSON valid**. Soal harus **REALISTIS setara ujian asli** (berpikir, bukan menghafal; kosakata & istilah akademik).
 Output objek tunggal persis:
 {
-  "packages": [{ "id": "simak-pasca-01", "name": "Tryout SIMAK UI Pascasarjana", "program": "SIMAK UI Pascasarjana", "mode": "sections", "durationMin": 170, "sectionMinutes": { "Kemampuan Verbal": 30, "Kemampuan Kuantitatif": 50, "Kemampuan Penalaran": 40, "Bahasa Inggris": 50 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "packages": [{ "id": "simak-pasca-01", "name": "Tryout SIMAK UI Pascasarjana Paket 1", "program": "SIMAK UI Pascasarjana", "mode": "sections", "durationMin": 170, "sectionMinutes": { "Kemampuan Verbal": 30, "Kemampuan Kuantitatif": 50, "Kemampuan Penalaran": 40, "Bahasa Inggris": 50 }, "shuffleQuestions": true, "shuffleOptions": true }],
   "questions": [ /* tepat 25 objek soal */ ]
 }
 Tiap soal: { "packageId": "simak-pasca-01", "subject": "Kemampuan Verbal", "subtopic": <salah satu di bawah, persis>, "difficulty": 1|2|3, "text", "options": [5 string, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat", "optExplain": [5 string sejajar — distraktor sebut kesalahan berpikirnya], "steps": [] }. JANGAN sertakan `id`/`image`.
@@ -46,7 +71,7 @@ OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing co
 Kamu penyusun soal **SIMAK UI Pascasarjana (TPA)** ahli pedagogi & psikometri. Buat **25 soal** subtes **"Kemampuan Kuantitatif"** sebagai **JSON valid**, **REALISTIS setara ujian asli** (deret, aritmetika, aljabar, geometri dasar; menekankan nalar).
 Output objek tunggal persis:
 {
-  "packages": [{ "id": "simak-pasca-01", "name": "Tryout SIMAK UI Pascasarjana", "program": "SIMAK UI Pascasarjana", "mode": "sections", "durationMin": 170, "sectionMinutes": { "Kemampuan Verbal": 30, "Kemampuan Kuantitatif": 50, "Kemampuan Penalaran": 40, "Bahasa Inggris": 50 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "packages": [{ "id": "simak-pasca-01", "name": "Tryout SIMAK UI Pascasarjana Paket 1", "program": "SIMAK UI Pascasarjana", "mode": "sections", "durationMin": 170, "sectionMinutes": { "Kemampuan Verbal": 30, "Kemampuan Kuantitatif": 50, "Kemampuan Penalaran": 40, "Bahasa Inggris": 50 }, "shuffleQuestions": true, "shuffleOptions": true }],
   "questions": [ /* tepat 25 objek soal */ ]
 }
 Tiap soal: { "packageId": "simak-pasca-01", "subject": "Kemampuan Kuantitatif", "subtopic": <salah satu di bawah, persis>, "difficulty": 1|2|3, "text", "options": [5 string, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat", "optExplain": [5 string sejajar — distraktor sebut kesalahan operasi/syarat], "steps": [array langkah perhitungan] }. JANGAN sertakan `id`/`image`.
@@ -62,7 +87,7 @@ OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing co
 Kamu penyusun soal **SIMAK UI Pascasarjana (TPA)** ahli pedagogi & psikometri. Buat **25 soal** subtes **"Kemampuan Penalaran"** sebagai **JSON valid**, **REALISTIS setara ujian asli** (logika formal, analitis, silogisme).
 Output objek tunggal persis:
 {
-  "packages": [{ "id": "simak-pasca-01", "name": "Tryout SIMAK UI Pascasarjana", "program": "SIMAK UI Pascasarjana", "mode": "sections", "durationMin": 170, "sectionMinutes": { "Kemampuan Verbal": 30, "Kemampuan Kuantitatif": 50, "Kemampuan Penalaran": 40, "Bahasa Inggris": 50 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "packages": [{ "id": "simak-pasca-01", "name": "Tryout SIMAK UI Pascasarjana Paket 1", "program": "SIMAK UI Pascasarjana", "mode": "sections", "durationMin": 170, "sectionMinutes": { "Kemampuan Verbal": 30, "Kemampuan Kuantitatif": 50, "Kemampuan Penalaran": 40, "Bahasa Inggris": 50 }, "shuffleQuestions": true, "shuffleOptions": true }],
   "questions": [ /* tepat 25 objek soal */ ]
 }
 Tiap soal: { "packageId": "simak-pasca-01", "subject": "Kemampuan Penalaran", "subtopic": <salah satu di bawah, persis>, "difficulty": 1|2|3, "text", "options": [5 string, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat", "optExplain": [5 string sejajar — distraktor sebut kesalahan nalar (membalik implikasi, overgeneralisasi)], "steps": [langkah penalaran bila berhitung; selain itu []] }. JANGAN sertakan `id`/`image`.
@@ -77,7 +102,7 @@ OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing co
 Kamu penyusun soal **SIMAK UI Pascasarjana — Bahasa Inggris akademik (setara TOEFL)** yang ahli. Buat **25 soal** subtes **"Bahasa Inggris"** sebagai **JSON valid**, **REALISTIS** (structure & written expression + reading teks ilmiah).
 Output objek tunggal persis:
 {
-  "packages": [{ "id": "simak-pasca-01", "name": "Tryout SIMAK UI Pascasarjana", "program": "SIMAK UI Pascasarjana", "mode": "sections", "durationMin": 170, "sectionMinutes": { "Kemampuan Verbal": 30, "Kemampuan Kuantitatif": 50, "Kemampuan Penalaran": 40, "Bahasa Inggris": 50 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "packages": [{ "id": "simak-pasca-01", "name": "Tryout SIMAK UI Pascasarjana Paket 1", "program": "SIMAK UI Pascasarjana", "mode": "sections", "durationMin": 170, "sectionMinutes": { "Kemampuan Verbal": 30, "Kemampuan Kuantitatif": 50, "Kemampuan Penalaran": 40, "Bahasa Inggris": 50 }, "shuffleQuestions": true, "shuffleOptions": true }],
   "questions": [ /* tepat 25 objek soal */ ]
 }
 Tiap soal: { "packageId": "simak-pasca-01", "subject": "Bahasa Inggris", "subtopic": <salah satu di bawah, persis>, "difficulty": 1|2|3, "text", "options": [5 string, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat", "optExplain": [5 string sejajar — sebut aturan tata bahasa yang dilanggar / mengapa inferensi tak didukung], "steps": [] }. Untuk reading, tulis **paragraf akademik utuh (4–7 kalimat)** lalu `\n` lalu pertanyaan. JANGAN sertakan `id`/`image`.
@@ -92,13 +117,15 @@ OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing co
 
 Pisahkan jadi 3 paket sesuai rumpun (id berbeda): **Kemampuan Dasar** (`simak-ui-kd-01`), **IPA** (`simak-ui-ipa-01`), **IPS** (`simak-ui-ips-01`). Tiap blok = 20 soal.
 
+> Untuk paket tryout berikutnya yang **terpisah**, naikkan nomornya: mis. `simak-ui-kd-02` + `name` → `… Paket 2` (lihat [Aturan penamaan paket](#aturan-penamaan-paket-kapan-menyatu-vs-terpisah)).
+
 ### 2a. Matematika Dasar (Kemampuan Dasar) — 20 soal
 
 === MULAI PROMPT ===
 Kamu penyusun soal **SIMAK UI S1 — Kemampuan Dasar** yang ahli. Buat **20 soal** mata uji **"Matematika Dasar"** sebagai **JSON valid**, **REALISTIS setara ujian masuk UI** (aplikatif & multi-langkah, setara/di atas SBMPTN).
 Output objek tunggal persis:
 {
-  "packages": [{ "id": "simak-ui-kd-01", "name": "Tryout SIMAK UI — Kemampuan Dasar", "program": "SIMAK UI", "mode": "sections", "durationMin": 75, "sectionMinutes": { "Matematika Dasar": 30, "Bahasa Indonesia": 20, "Bahasa Inggris": 25 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "packages": [{ "id": "simak-ui-kd-01", "name": "Tryout SIMAK UI — Kemampuan Dasar Paket 1", "program": "SIMAK UI", "mode": "sections", "durationMin": 75, "sectionMinutes": { "Matematika Dasar": 30, "Bahasa Indonesia": 20, "Bahasa Inggris": 25 }, "shuffleQuestions": true, "shuffleOptions": true }],
   "questions": [ /* tepat 20 objek soal */ ]
 }
 Tiap soal: { "packageId": "simak-ui-kd-01", "subject": "Matematika Dasar", "subtopic": <topik spesifik>, "difficulty": 1|2|3, "text", "options": [5, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat", "optExplain": [5 sejajar — distraktor sebut kesalahan konsep/operasi], "steps": [langkah perhitungan] }. JANGAN sertakan `id`/`image`.
@@ -114,7 +141,7 @@ OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing co
 Kamu penyusun soal **SIMAK UI S1 — Kemampuan Dasar** yang ahli. Buat **20 soal** mata uji **"Bahasa Indonesia"** sebagai **JSON valid**, **REALISTIS setara ujian masuk UI**.
 Output objek tunggal persis:
 {
-  "packages": [{ "id": "simak-ui-kd-01", "name": "Tryout SIMAK UI — Kemampuan Dasar", "program": "SIMAK UI", "mode": "sections", "durationMin": 75, "sectionMinutes": { "Matematika Dasar": 30, "Bahasa Indonesia": 20, "Bahasa Inggris": 25 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "packages": [{ "id": "simak-ui-kd-01", "name": "Tryout SIMAK UI — Kemampuan Dasar Paket 1", "program": "SIMAK UI", "mode": "sections", "durationMin": 75, "sectionMinutes": { "Matematika Dasar": 30, "Bahasa Indonesia": 20, "Bahasa Inggris": 25 }, "shuffleQuestions": true, "shuffleOptions": true }],
   "questions": [ /* tepat 20 objek soal */ ]
 }
 Tiap soal: { "packageId": "simak-ui-kd-01", "subject": "Bahasa Indonesia", "subtopic": <topik spesifik>, "difficulty": 1|2|3, "text", "options": [5, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat", "optExplain": [5 sejajar — distraktor sebut kesalahan umum], "steps": [] }. Untuk soal teks, sertakan **paragraf utuh** di `text` lalu `\n` lalu pertanyaan. JANGAN sertakan `id`/`image`.
@@ -129,7 +156,7 @@ OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing co
 Kamu penyusun soal **SIMAK UI S1 — Kemampuan Dasar** yang ahli. Buat **20 soal** mata uji **"Bahasa Inggris"** sebagai **JSON valid**, **REALISTIS setara ujian masuk UI** (grammar + reading akademik).
 Output objek tunggal persis:
 {
-  "packages": [{ "id": "simak-ui-kd-01", "name": "Tryout SIMAK UI — Kemampuan Dasar", "program": "SIMAK UI", "mode": "sections", "durationMin": 75, "sectionMinutes": { "Matematika Dasar": 30, "Bahasa Indonesia": 20, "Bahasa Inggris": 25 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "packages": [{ "id": "simak-ui-kd-01", "name": "Tryout SIMAK UI — Kemampuan Dasar Paket 1", "program": "SIMAK UI", "mode": "sections", "durationMin": 75, "sectionMinutes": { "Matematika Dasar": 30, "Bahasa Indonesia": 20, "Bahasa Inggris": 25 }, "shuffleQuestions": true, "shuffleOptions": true }],
   "questions": [ /* tepat 20 objek soal */ ]
 }
 Tiap soal: { "packageId": "simak-ui-kd-01", "subject": "Bahasa Inggris", "subtopic": <Reading / Vocabulary in Context / Structure>, "difficulty": 1|2|3, "text", "options": [5, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat", "optExplain": [5 sejajar — sebut aturan tata bahasa yang dilanggar / mengapa pilihan tak cocok], "steps": [] }. Untuk reading, sertakan **paragraf utuh** lalu `\n` lalu pertanyaan. JANGAN sertakan `id`/`image`.
@@ -146,7 +173,7 @@ OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing co
 Kamu penyusun soal **SIMAK UI S1 — Kemampuan IPA** yang ahli. Buat **20 soal** mata uji **"Matematika IPA"** (ganti ke Fisika/Kimia/Biologi bila perlu) sebagai **JSON valid**, **REALISTIS setara ujian masuk UI** (aplikatif & analitis).
 Output objek tunggal persis:
 {
-  "packages": [{ "id": "simak-ui-ipa-01", "name": "Tryout SIMAK UI — IPA", "program": "SIMAK UI", "mode": "sections", "durationMin": 120, "sectionMinutes": { "Matematika IPA": 30, "Fisika": 30, "Kimia": 30, "Biologi": 30 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "packages": [{ "id": "simak-ui-ipa-01", "name": "Tryout SIMAK UI — IPA Paket 1", "program": "SIMAK UI", "mode": "sections", "durationMin": 120, "sectionMinutes": { "Matematika IPA": 30, "Fisika": 30, "Kimia": 30, "Biologi": 30 }, "shuffleQuestions": true, "shuffleOptions": true }],
   "questions": [ /* tepat 20 objek soal */ ]
 }
 Tiap soal: { "packageId": "simak-ui-ipa-01", "subject": "Matematika IPA", "subtopic": <topik kurikulum spesifik>, "difficulty": 1|2|3, "text", "options": [5, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat", "optExplain": [5 sejajar — distraktor = kesalahan konsep/operasi lazim], "steps": [langkah untuk soal numerik; selain itu []] }. JANGAN sertakan `id`/`image`.
@@ -164,7 +191,7 @@ OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing co
 Kamu penyusun soal **SIMAK UI S1 — Kemampuan IPS** yang ahli. Buat **20 soal** mata uji **"Ekonomi"** (ganti ke Sejarah/Geografi/Sosiologi bila perlu) sebagai **JSON valid**, **REALISTIS setara ujian masuk UI** (analitis & aplikatif).
 Output objek tunggal persis:
 {
-  "packages": [{ "id": "simak-ui-ips-01", "name": "Tryout SIMAK UI — IPS", "program": "SIMAK UI", "mode": "sections", "durationMin": 90, "sectionMinutes": { "Ekonomi": 30, "Sejarah": 20, "Geografi": 20, "Sosiologi": 20 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "packages": [{ "id": "simak-ui-ips-01", "name": "Tryout SIMAK UI — IPS Paket 1", "program": "SIMAK UI", "mode": "sections", "durationMin": 90, "sectionMinutes": { "Ekonomi": 30, "Sejarah": 20, "Geografi": 20, "Sosiologi": 20 }, "shuffleQuestions": true, "shuffleOptions": true }],
   "questions": [ /* tepat 20 objek soal */ ]
 }
 Tiap soal: { "packageId": "simak-ui-ips-01", "subject": "Ekonomi", "subtopic": <topik kurikulum spesifik>, "difficulty": 1|2|3, "text", "options": [5, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat", "optExplain": [5 sejajar — distraktor = miskonsepsi lazim], "steps": [] }. JANGAN sertakan `id`/`image`.
@@ -179,13 +206,15 @@ OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing co
 
 `id` paket: **`toefl-itp-01`**. Blueprint: Structure & Written Expression 40 item · Reading Comprehension 50 item. Tiap blok di bawah satu kali jalan; ulangi (2×) untuk mencapai blueprint penuh.
 
+> Untuk paket tryout berikutnya yang **terpisah**, naikkan nomornya: `id` → `toefl-itp-02` dan `name` → `… Paket 2` (lihat [Aturan penamaan paket](#aturan-penamaan-paket-kapan-menyatu-vs-terpisah)).
+
 ### 3a. Structure & Written Expression — 20 item
 
 === MULAI PROMPT ===
 You are an expert **TOEFL ITP** item writer (ETS-style). Produce **exactly 20 items** for the subtest **"Structure & Written Expression"** as **valid JSON**. Items MUST be **REALISTIC and authentic to the actual TOEFL ITP** (formal academic register; one clean grammar point each).
 Output a single object exactly:
 {
-  "packages": [{ "id": "toefl-itp-01", "name": "Tryout TOEFL ITP", "program": "TOEFL", "mode": "sections", "durationMin": 80, "sectionMinutes": { "Structure & Written Expression": 25, "Reading Comprehension": 55 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "packages": [{ "id": "toefl-itp-01", "name": "Tryout TOEFL ITP Paket 1", "program": "TOEFL", "mode": "sections", "durationMin": 80, "sectionMinutes": { "Structure & Written Expression": 25, "Reading Comprehension": 55 }, "shuffleQuestions": true, "shuffleOptions": true }],
   "questions": [ /* exactly 20 item objects */ ]
 }
 Each item: { "packageId": "toefl-itp-01", "subject": "Structure & Written Expression", "subtopic": <from list>, "difficulty": 1|2|3, "text", "options": [5 strings A–E], "answer": "A"–"E", "pembahasan": "1–3 sentences", "optExplain": [5 parallel — name the grammar rule violated by each distractor], "steps": [] }. For *Structure*, write the sentence with a blank `___`. For *Written Expression*, write the sentence marking four parts `(A) … (B) … (C) … (D) …` and ask to identify the error (5th option may be "No error" if appropriate). Do NOT include `id`/`image`.
@@ -200,7 +229,7 @@ OUTPUT: ONLY valid JSON — no code fences, no extra text, no trailing comma. Pr
 You are an expert **TOEFL ITP** item writer (ETS-style). Produce **exactly 25 items** for the subtest **"Reading Comprehension"** as **valid JSON**, **REALISTIC and authentic** (self-contained academic passages: science/history/nature).
 Output a single object exactly:
 {
-  "packages": [{ "id": "toefl-itp-01", "name": "Tryout TOEFL ITP", "program": "TOEFL", "mode": "sections", "durationMin": 80, "sectionMinutes": { "Structure & Written Expression": 25, "Reading Comprehension": 55 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "packages": [{ "id": "toefl-itp-01", "name": "Tryout TOEFL ITP Paket 1", "program": "TOEFL", "mode": "sections", "durationMin": 80, "sectionMinutes": { "Structure & Written Expression": 25, "Reading Comprehension": 55 }, "shuffleQuestions": true, "shuffleOptions": true }],
   "questions": [ /* exactly 25 item objects */ ]
 }
 Each item: { "packageId": "toefl-itp-01", "subject": "Reading Comprehension", "subtopic": <from list>, "difficulty": 1|2|3, "text", "options": [5 strings A–E], "answer": "A"–"E", "pembahasan": "1–3 sentences", "optExplain": [5 parallel — why each distractor is unsupported by the passage], "steps": [] }. In `text`, put the **full passage (4–7 sentences)**, then a blank line (`\n`), then the question. You may reuse one passage for 2–3 consecutive questions. Do NOT include `id`/`image`.
@@ -215,13 +244,15 @@ OUTPUT: ONLY valid JSON — no code fences, no extra text, no trailing comma. Pr
 
 `id` paket: **`sbmptn-tps-01`**.
 
+> Untuk paket tryout berikutnya yang **terpisah**, naikkan nomornya: `id` → `sbmptn-tps-02` dan `name` → `… Paket 2` (lihat [Aturan penamaan paket](#aturan-penamaan-paket-kapan-menyatu-vs-terpisah)).
+
 ### 4a. Penalaran Umum — 25 soal
 
 === MULAI PROMPT ===
 Kamu penyusun soal **UTBK-SBMPTN TPS** ahli psikometri. Buat **25 soal** subtes **"Penalaran Umum"** sebagai **JSON valid**, **REALISTIS sesuai UTBK terkini** (berbasis stimulus tabel/grafik/teks; menekankan nalar).
 Output objek tunggal persis:
 {
-  "packages": [{ "id": "sbmptn-tps-01", "name": "Tryout SBMPTN (UTBK) — TPS", "program": "SBMPTN", "mode": "sections", "durationMin": 90, "sectionMinutes": { "Penalaran Umum": 30, "Pengetahuan dan Pemahaman Umum": 15, "Pemahaman Bacaan dan Menulis": 25, "Pengetahuan Kuantitatif": 20 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "packages": [{ "id": "sbmptn-tps-01", "name": "Tryout SBMPTN (UTBK) — TPS Paket 1", "program": "SBMPTN", "mode": "sections", "durationMin": 90, "sectionMinutes": { "Penalaran Umum": 30, "Pengetahuan dan Pemahaman Umum": 15, "Pemahaman Bacaan dan Menulis": 25, "Pengetahuan Kuantitatif": 20 }, "shuffleQuestions": true, "shuffleOptions": true }],
   "questions": [ /* tepat 25 objek soal */ ]
 }
 Tiap soal: { "packageId": "sbmptn-tps-01", "subject": "Penalaran Umum", "subtopic": <dari daftar, persis>, "difficulty": 1|2|3, "text", "options": [5, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat", "optExplain": [5 sejajar — distraktor sebut kesalahan nalar (overgeneralisasi, membalik implikasi, salah baca data)], "steps": [bila kuantitatif; selain itu []] }. Untuk soal berstimulus, tulis teks/tabel dalam bentuk teks lalu `\n` lalu pertanyaan. JANGAN sertakan `id`/`image`.
@@ -237,7 +268,7 @@ OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing co
 Kamu penyusun soal **UTBK-SBMPTN TPS** ahli psikometri. Buat **20 soal** subtes **"Pengetahuan dan Pemahaman Umum"** sebagai **JSON valid**, **REALISTIS sesuai UTBK terkini**.
 Output objek tunggal persis:
 {
-  "packages": [{ "id": "sbmptn-tps-01", "name": "Tryout SBMPTN (UTBK) — TPS", "program": "SBMPTN", "mode": "sections", "durationMin": 90, "sectionMinutes": { "Penalaran Umum": 30, "Pengetahuan dan Pemahaman Umum": 15, "Pemahaman Bacaan dan Menulis": 25, "Pengetahuan Kuantitatif": 20 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "packages": [{ "id": "sbmptn-tps-01", "name": "Tryout SBMPTN (UTBK) — TPS Paket 1", "program": "SBMPTN", "mode": "sections", "durationMin": 90, "sectionMinutes": { "Penalaran Umum": 30, "Pengetahuan dan Pemahaman Umum": 15, "Pemahaman Bacaan dan Menulis": 25, "Pengetahuan Kuantitatif": 20 }, "shuffleQuestions": true, "shuffleOptions": true }],
   "questions": [ /* tepat 20 objek soal */ ]
 }
 Tiap soal: { "packageId": "sbmptn-tps-01", "subject": "Pengetahuan dan Pemahaman Umum", "subtopic": <dari daftar, persis>, "difficulty": 1|2|3, "text", "options": [5, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat", "optExplain": [5 sejajar — distraktor sebut kesalahan makna/konteks], "steps": [] }. JANGAN sertakan `id`/`image`.
@@ -252,7 +283,7 @@ OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing co
 Kamu penyusun soal **UTBK-SBMPTN TPS** ahli psikometri. Buat **20 soal** subtes **"Pemahaman Bacaan dan Menulis"** sebagai **JSON valid**, **REALISTIS sesuai UTBK terkini** (bacaan + perbaikan kalimat/ejaan).
 Output objek tunggal persis:
 {
-  "packages": [{ "id": "sbmptn-tps-01", "name": "Tryout SBMPTN (UTBK) — TPS", "program": "SBMPTN", "mode": "sections", "durationMin": 90, "sectionMinutes": { "Penalaran Umum": 30, "Pengetahuan dan Pemahaman Umum": 15, "Pemahaman Bacaan dan Menulis": 25, "Pengetahuan Kuantitatif": 20 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "packages": [{ "id": "sbmptn-tps-01", "name": "Tryout SBMPTN (UTBK) — TPS Paket 1", "program": "SBMPTN", "mode": "sections", "durationMin": 90, "sectionMinutes": { "Penalaran Umum": 30, "Pengetahuan dan Pemahaman Umum": 15, "Pemahaman Bacaan dan Menulis": 25, "Pengetahuan Kuantitatif": 20 }, "shuffleQuestions": true, "shuffleOptions": true }],
   "questions": [ /* tepat 20 objek soal */ ]
 }
 Tiap soal: { "packageId": "sbmptn-tps-01", "subject": "Pemahaman Bacaan dan Menulis", "subtopic": <dari daftar, persis>, "difficulty": 1|2|3, "text", "options": [5, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat", "optExplain": [5 sejajar — distraktor sebut pelanggaran kaidah (PUEBI, kepaduan)], "steps": [] }. Sertakan **bacaan/kalimat bernomor** di `text` lalu `\n` lalu pertanyaan. JANGAN sertakan `id`/`image`.
@@ -267,7 +298,7 @@ OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing co
 Kamu penyusun soal **UTBK-SBMPTN TPS** ahli psikometri. Buat **20 soal** subtes **"Pengetahuan Kuantitatif"** sebagai **JSON valid**, **REALISTIS sesuai UTBK terkini** (termasuk soal **kecukupan data**).
 Output objek tunggal persis:
 {
-  "packages": [{ "id": "sbmptn-tps-01", "name": "Tryout SBMPTN (UTBK) — TPS", "program": "SBMPTN", "mode": "sections", "durationMin": 90, "sectionMinutes": { "Penalaran Umum": 30, "Pengetahuan dan Pemahaman Umum": 15, "Pemahaman Bacaan dan Menulis": 25, "Pengetahuan Kuantitatif": 20 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "packages": [{ "id": "sbmptn-tps-01", "name": "Tryout SBMPTN (UTBK) — TPS Paket 1", "program": "SBMPTN", "mode": "sections", "durationMin": 90, "sectionMinutes": { "Penalaran Umum": 30, "Pengetahuan dan Pemahaman Umum": 15, "Pemahaman Bacaan dan Menulis": 25, "Pengetahuan Kuantitatif": 20 }, "shuffleQuestions": true, "shuffleOptions": true }],
   "questions": [ /* tepat 20 objek soal */ ]
 }
 Tiap soal: { "packageId": "sbmptn-tps-01", "subject": "Pengetahuan Kuantitatif", "subtopic": <dari daftar, persis>, "difficulty": 1|2|3, "text", "options": [5, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat", "optExplain": [5 sejajar — distraktor = kesalahan operasi/syarat], "steps": [langkah perhitungan] }. JANGAN sertakan `id`/`image`.
@@ -283,6 +314,8 @@ OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing co
 
 `id` paket: **`ukmppd-01`**. Tiap soal = **vignette klinis** (skenario pasien) dengan satu jawaban paling tepat. Blok per disiplin di bawah memakai `sectionMinutes` yang sama agar semua tergabung ke satu paket ±150 soal. Ganti `subject` & jumlah sesuai kebutuhan.
 
+> Untuk paket tryout berikutnya yang **terpisah**, naikkan nomornya: `id` → `ukmppd-02` dan `name` → `… Paket 2` (lihat [Aturan penamaan paket](#aturan-penamaan-paket-kapan-menyatu-vs-terpisah)).
+
 > Disiplin & jumlah saran (mengikuti bobot SKDI): Ilmu Penyakit Dalam 25 · Ilmu Kesehatan Anak 25 · Bedah 15 · Obstetri & Ginekologi 20 · Neurologi 15 · Psikiatri 10 · Kardiologi 10 · THT-KL 10 · Mata 10 · Kulit & Kelamin 10 · Forensik & Medikolegal 10 · Ilmu Kesehatan Masyarakat 10.
 
 ### Blok generik UKMPPD (ganti `subject` & jumlah `N`)
@@ -291,7 +324,7 @@ OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing co
 Kamu penyusun soal **UKMPPD CBT** ahli kedokteran klinis & item-writing sesuai blueprint SKDI. Buat **20 soal** (ganti **N** sesuai disiplin) disiplin **"Ilmu Penyakit Dalam"** (ganti `subject` sesuai kebutuhan) sebagai **JSON valid**. Tiap soal = **vignette klinis REALISTIS** (skenario pasien lengkap), satu jawaban paling tepat — **bukan** hafalan satu baris.
 Output objek tunggal persis:
 {
-  "packages": [{ "id": "ukmppd-01", "name": "Tryout UKMPPD", "program": "UKMPPD (Dokter)", "mode": "sections", "durationMin": 175, "sectionMinutes": { "Ilmu Penyakit Dalam": 35, "Ilmu Kesehatan Anak": 30, "Bedah": 20, "Obstetri & Ginekologi": 25, "Neurologi": 15, "Psikiatri": 10, "Kardiologi": 10, "THT-KL": 10, "Mata": 10, "Kulit & Kelamin": 10, "Forensik & Medikolegal": 5, "Ilmu Kesehatan Masyarakat": 5 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "packages": [{ "id": "ukmppd-01", "name": "Tryout UKMPPD Paket 1", "program": "UKMPPD (Dokter)", "mode": "sections", "durationMin": 175, "sectionMinutes": { "Ilmu Penyakit Dalam": 35, "Ilmu Kesehatan Anak": 30, "Bedah": 20, "Obstetri & Ginekologi": 25, "Neurologi": 15, "Psikiatri": 10, "Kardiologi": 10, "THT-KL": 10, "Mata": 10, "Kulit & Kelamin": 10, "Forensik & Medikolegal": 5, "Ilmu Kesehatan Masyarakat": 5 }, "shuffleQuestions": true, "shuffleOptions": true }],
   "questions": [ /* tepat N objek soal */ ]
 }
 Tiap soal: { "packageId": "ukmppd-01", "subject": "Ilmu Penyakit Dalam", "subtopic": <sistem/organ, mis. "Endokrin", "Respirologi", "Kegawatdaruratan", "Infeksi Tropis">, "difficulty": 1|2|3, "text": "<vignette lengkap, pakai \\n antar bagian>", "options": [5 string **homogen** A–E], "answer": "A"–"E", "pembahasan": "1–4 kalimat: alasan kunci benar + clue dari vignette", "optExplain": [5 sejajar — distraktor sebut mengapa keliru (gejala pembeda yang tak cocok), harus *near-miss* klinis], "steps": [] }. JANGAN sertakan `id`/`image`.
