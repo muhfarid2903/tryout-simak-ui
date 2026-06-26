@@ -272,6 +272,9 @@ body.is-admin .nav-section { display: block; }
 .sidebar-collapsed .mainnav { padding: 8px; align-items: center; }
 .sidebar-collapsed .navbtn { justify-content: center; padding: 10px 0; width: 48px; }
 .sidebar-collapsed .nav-label { display: none; }
+/* Sembunyikan scrollbar di rail sempit (tetap bisa digulir) — agar tampilan bersih saat dilipat */
+.sidebar-collapsed .mainnav { scrollbar-width: none; }
+.sidebar-collapsed .mainnav::-webkit-scrollbar { width: 0; height: 0; }
 .sidebar-collapsed .sidebar-foot { justify-content: center; }
 
 /* ---------- Area konten ---------- */
