@@ -173,6 +173,7 @@ body {
   gap: 4px;
   padding: 8px 12px;
   overflow-y: auto;
+  overflow-x: hidden;   /* cegah scrollbar samping saat sidebar dilipat (rail) */
   flex: 1;
 }
 .mainnav::-webkit-scrollbar { width: 8px; }
