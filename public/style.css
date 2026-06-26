@@ -379,7 +379,7 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--u
 }
 
 .q-meta { font-size: 13px; color: var(--ui-ink-soft); margin-bottom: 6px; }
-.q-text { font-size: 16px; margin-bottom: 18px; white-space: pre-wrap; }
+.q-text { font-size: 16px; margin-bottom: 18px; white-space: pre-wrap; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .q-img { max-width: 100%; border-radius: 10px; margin: 8px 0 16px; }
 
 .choice {
@@ -399,7 +399,7 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--u
   display: grid; place-items: center; background: var(--surface-mute); font-weight: 700;
 }
 .choice.selected .key { background: var(--ui-yellow); color: var(--brand-dark); }
-.choice .ctext { white-space: pre-wrap; }
+.choice .ctext { white-space: pre-wrap; flex: 1; min-width: 0; overflow-x: auto; overflow-wrap: anywhere; }
 
 /* Umpan balik per-distraktor */
 .opt-note { margin: -6px 0 10px 40px; font-size: 13px; color: var(--ui-ink-soft); border-left: 3px solid var(--border); padding: 3px 0 3px 10px; white-space: pre-wrap; }
@@ -439,6 +439,9 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--u
 table.subj { width: 100%; border-collapse: collapse; }
 table.subj th, table.subj td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
 table.subj th { background: var(--surface-soft); }
+/* Bungkus tabel agar di layar sempit ia menggulir mendatar, bukan merusak/menjebol lebar halaman */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+.table-scroll table.subj { min-width: 460px; }
 
 /* ---------- Materi ---------- */
 /* Tab pemilih mata uji */

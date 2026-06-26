@@ -2277,7 +2277,7 @@ function achievementsBody(root) {
             }, "Ya, hapus") }, "Hapus")),
       ]));
     });
-    card.appendChild(table);
+    card.appendChild(el("div", { class: "table-scroll" }, [table]));
     root.appendChild(card);
 
     root.appendChild(el("div", { class: "btn-row", style: "margin-top:18px" }, [
@@ -2733,7 +2733,7 @@ function renderResult(r) {
     table.appendChild(el("tr", {}, [el("td", {}, subj), el("td", {}, String(d.correct)), el("td", {}, String(d.wrong)), el("td", {}, String(d.empty)), el("td", {}, String(sc)),
       hasTime ? el("td", {}, d.total ? fmtDur(d.timeMs / d.total) : "–") : null]));
   });
-  tableCard.appendChild(table);
+  tableCard.appendChild(el("div", { class: "table-scroll" }, [table]));
   if (hasTime) tableCard.appendChild(el("div", { class: "q-meta", style: "margin-top:10px" }, `⏱ Total waktu pengerjaan: ${fmtDur(r.totalTimeMs)}`));
   root.appendChild(tableCard);
 
@@ -4235,7 +4235,7 @@ async function renderAdminUsers() {
         el("td", {}, action),
       ]));
     });
-    card.appendChild(table);
+    card.appendChild(el("div", { class: "table-scroll" }, [table]));
     card.appendChild(el("div", { class: "q-meta", style: "padding:12px 16px" }, `Total: ${out.users.length} user`));
   } catch (e) {
     card.innerHTML = "";
@@ -4350,11 +4350,11 @@ async function renderAdminResults() {
             el("td", {}, h.durationMs ? fmtDur(h.durationMs) : "—"),
           ]));
         });
-        det.appendChild(el("div", { class: "bank-materi-body" }, [ht]));
+        det.appendChild(el("div", { class: "bank-materi-body" }, [el("div", { class: "table-scroll" }, [ht])]));
         table.appendChild(el("tr", {}, [el("td", { colspan: "5", style: "padding:0 12px 12px" }, det)]));
       }
     });
-    card.appendChild(table);
+    card.appendChild(el("div", { class: "table-scroll" }, [table]));
     return card;
   }
 
