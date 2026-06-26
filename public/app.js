@@ -1267,7 +1267,7 @@ function go(view, arg) {
   // Wajib login: selain halaman akun, arahkan ke login bila belum masuk.
   if (!isLoggedIn() && view !== "account") { currentView = "account"; setNav(""); updateSidebar(); window.scrollTo(0, 0); renderAccount(); return; }
   // Wajib pilih ruangan dulu: selain Akun & Lobi, arahkan ke Lobi bila belum memilih program.
-  if (isLoggedIn() && !activeProgram() && view !== "account" && view !== "lobby" && view !== "exam") view = "lobby";
+  if (isLoggedIn() && !activeProgram() && view !== "account" && view !== "lobby" && view !== "exam" && view !== "examintro") view = "lobby";
   // Halaman admin hanya untuk admin.
   if (ADMIN_VIEWS.includes(view) && !isAdmin()) { toast("Khusus admin"); view = "home"; }
   currentView = view;
@@ -1283,6 +1283,7 @@ function go(view, arg) {
   else if (view === "bank") renderBank();
   else if (view === "materi") renderMateri(arg);
   else if (view === "achievements") renderAchievements();
+  else if (view === "examintro") renderExamIntro(arg);
   else if (view === "exam") renderExam();
   else if (view === "result") renderResult(arg);
   else if (view === "account") renderAccount();
@@ -2362,7 +2363,66 @@ function buildSections(pkg, qs) {
   return [{ subject: null, minutes: pkg.durationMin, qs }];
 }
 
+// Klik "Mulai" → tampilkan dulu layar konfirmasi (aturan & cara pakai), baru mulai.
 function startExam(pkgId) {
+  const pkg = pkgById(pkgId);
+  const qs = questionsOf(pkgId);
+  if (!pkg || qs.length === 0) { toast("Paket belum punya soal"); return; }
+  go("examintro", pkgId);
+}
+
+// Layar konfirmasi pra-tryout: ringkasan + aturan + cara pakai (tidak tampil saat ujian berjalan).
+function renderExamIntro(pkgId) {
+  const pkg = pkgById(pkgId);
+  const qs = pkg ? questionsOf(pkgId) : [];
+  if (!pkg || qs.length === 0) { toast("Paket belum punya soal"); go("home"); return; }
+  const root = app();
+  root.innerHTML = "";
+  const sections = buildSections(pkg, qs);
+  const totalMin = sections.reduce((a, s) => a + (s.minutes || 0), 0);
+  const isSections = pkg.mode === "sections";
+
+  root.appendChild(el("h2", { class: "page-title" }, pkg.name));
+  root.appendChild(el("p", { class: "page-sub" }, "Siap memulai? Baca dulu aturan singkat di bawah — tryout akan dimulai setelah kamu menekan tombol Mulai."));
+
+  // Ringkasan paket
+  const summary = el("div", { class: "intro-summary" }, [
+    el("div", { class: "intro-stat" }, [el("b", {}, String(qs.length)), el("span", {}, "soal")]),
+    el("div", { class: "intro-stat" }, [el("b", {}, `${totalMin}`), el("span", {}, "menit")]),
+    el("div", { class: "intro-stat" }, [el("b", {}, isSections ? String(sections.length) : "1"), el("span", {}, isSections ? "sesi mata uji" : "sesi")]),
+  ]);
+
+  // Aturan
+  const rules = [
+    `Penilaian: jawaban benar +${SCORE.correct}, salah ${SCORE.wrong}, kosong 0.`,
+    isSections
+      ? "Mode sesi: setiap mata uji punya waktu sendiri. Setelah pindah mata uji, kamu tidak bisa kembali ke mata uji sebelumnya."
+      : "Waktu berjalan untuk seluruh soal sekaligus.",
+    "Waktu berjalan otomatis; saat habis, jawaban dikumpulkan otomatis.",
+    "Progres tersimpan otomatis — aman jika halaman ter-reload.",
+  ];
+  const howto = "Pintasan keyboard (desktop): tekan 1–5 atau A–E untuk memilih jawaban · ← → untuk pindah soal · F untuk menandai ragu-ragu. Di HP, gunakan tombol ☰ Navigasi untuk berpindah antar nomor.";
+
+  const card = el("div", { class: "card" }, [
+    summary,
+    el("div", { class: "intro-block" }, [
+      el("div", { class: "intro-label" }, "Aturan"),
+      el("ul", { class: "intro-list" }, rules.map(r => el("li", {}, r))),
+    ]),
+    el("div", { class: "intro-block" }, [
+      el("div", { class: "intro-label" }, "Cara pakai"),
+      el("p", { class: "intro-howto" }, howto),
+    ]),
+    el("div", { class: "btn-row", style: "margin-top:20px" }, [
+      el("button", { class: "btn primary", onclick: () => beginExam(pkgId) }, "Mulai Tryout →"),
+      el("button", { class: "btn", onclick: () => go("home") }, "Batal"),
+    ]),
+  ]);
+  root.appendChild(card);
+}
+
+// Mulai tryout sungguhan: bangun sesi, set timer, masuk layar ujian.
+function beginExam(pkgId) {
   const pkg = pkgById(pkgId);
   const qs = questionsOf(pkgId);
   if (!pkg || qs.length === 0) { toast("Paket belum punya soal"); return; }
@@ -2476,9 +2536,6 @@ function renderExam() {
     ]),
   ]));
 
-  if (isSections) root.appendChild(el("div", { class: "note", style: "margin-bottom:14px" },
-    "Mode sesi: setelah pindah mata uji kamu tidak bisa kembali ke mata uji sebelumnya."));
-
   const layout = el("div", { class: "exam-layout" });
   layout.appendChild(el("div", { id: "examMain" }));
 
@@ -2490,7 +2547,6 @@ function renderExam() {
       el("span", { class: "l-flag" }, "Ragu-ragu"),
       el("span", { class: "l-empty" }, "Belum dijawab"),
     ]),
-    el("div", { class: "kbd-hint" }, "⌨️ Pintasan: 1–5 / A–E pilih jawaban · ← → pindah soal · F tandai ragu"),
   ];
   if (isSections) {
     sideChildren.push(el("div", { class: "divider" }));
