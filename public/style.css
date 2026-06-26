@@ -452,6 +452,9 @@ table.subj th { background: var(--surface-soft); }
 /* Bungkus tabel agar di layar sempit ia menggulir mendatar, bukan merusak/menjebol lebar halaman */
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
 .table-scroll table.subj { min-width: 460px; }
+/* Tabel "fit": teks (mis. email) membungkus & tanpa lebar minimum → muat penuh di portrait, tanpa scroll samping */
+.table-scroll table.subj.subj-fit { min-width: 0; }
+table.subj.subj-fit th, table.subj.subj-fit td { overflow-wrap: anywhere; }
 
 /* ---------- Materi ---------- */
 /* Tab pemilih mata uji */
