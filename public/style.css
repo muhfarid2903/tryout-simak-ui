@@ -25,6 +25,10 @@
   --warm-border: #f1e3b5;
   --warm-ink: #8a6500;
   --chip-warm: #f9f1d8;
+  /* Teks di atas sidebar charcoal — netral hangat agar menyatu dengan palet (bukan biru-slate) */
+  --side-fg: #e8e8ea;     /* utama (nav idle) */
+  --side-mute: #a9a9ad;   /* sekunder (label, tagline) */
+  --side-faint: #6f6f73;  /* paling redup (judul seksi) */
 }
 
 [data-theme="dark"] {
@@ -57,15 +61,20 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: "Inter", "Inter var", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background: var(--bg);
   color: var(--ui-ink);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
   letter-spacing: -0.011em;
   transition: background .3s ease, color .3s ease;
 }
+
+/* Angka rata & presisi (tabular) untuk metrik — terbaca seperti dashboard kelas atas */
+.score-hero .big, .stat-row b, .stat-card .sc-val, .ach-stat b, .mr-acc, .timer, .nav-cell { font-variant-numeric: tabular-nums; }
 
 /* =========================================================================
    LAYOUT: SIDEBAR (ala Claude — bisa dibuka, ditutup, & dilipat)
@@ -113,15 +122,15 @@ body {
 }
 .brand-text { min-width: 0; }
 .sidebar h1 { margin: 0; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.brand-sub { display: block; font-size: 11.5px; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tagline { margin: 0; font-size: 11.5px; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-sub { display: block; font-size: 11.5px; color: var(--side-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tagline { margin: 0; font-size: 11.5px; color: var(--side-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Tombol "Ganti ruangan" di atas menu nav */
 .room-switch {
   margin: 4px 12px 10px;
   padding: 8px 12px;
   background: rgba(255,255,255,0.06);
-  color: #e2e8f0;
+  color: var(--side-fg);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 10px;
   font-size: 13px;
@@ -145,7 +154,7 @@ body {
   margin-left: auto;
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: var(--side-mute);
   width: 34px; height: 34px;
   border-radius: 9px;
   cursor: pointer;
@@ -175,7 +184,7 @@ body {
   width: 100%;
   background: transparent;
   border: 1px solid transparent;
-  color: #cbd5e1;
+  color: var(--side-fg);
   padding: 10px 12px;
   border-radius: 10px;
   cursor: pointer;
@@ -197,7 +206,7 @@ body {
 .navbtn.active .nav-ico { opacity: 1; }
 
 /* Label seksi pengelompokan (hanya admin; user biasa hanya punya grup Belajar). */
-.nav-section { display: none; padding: 12px 12px 4px; font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: #64748b; }
+.nav-section { display: none; padding: 12px 12px 4px; font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--side-faint); }
 body.is-admin .nav-section { display: block; }
 /* Saat sidebar terlipat: label berubah jadi garis pemisah tipis. */
 .sidebar-collapsed .nav-section { height: 0; padding: 0; margin: 8px 12px; overflow: hidden; color: transparent; border-top: 1px solid rgba(255,255,255,.12); }
@@ -210,7 +219,7 @@ body.is-admin .nav-section { display: block; }
   padding: 12px 16px;
   border-top: 1px solid rgba(255,255,255,.1);
 }
-.theme-label { font-size: 13.5px; font-weight: 600; color: #cbd5e1; }
+.theme-label { font-size: 13.5px; font-weight: 600; color: var(--side-mute); }
 
 /* ---------- Bilah atas khusus layar kecil ---------- */
 .topbar-mobile {
