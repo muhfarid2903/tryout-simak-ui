@@ -1,26 +1,31 @@
 :root {
-  --ui-yellow: #f5c518;
-  --ui-yellow-dark: #c89400;
-  --ui-ink: #1d1d1f;           /* near-black ala Apple */
-  --ui-ink-soft: #6e6e73;      /* abu sekunder */
-  --brand-dark: #1d1d1f;       /* permukaan gelap netral (charcoal) di kedua tema */
-  --bg: #fbfbfd;
+  /* Aksen emas tua (antique gold) — lebih bersahaja & akademis ketimbang kuning terang */
+  --ui-yellow: #c2922e;
+  --ui-yellow-dark: #8a6412;
+  --gold-soft: #efe6cd;        /* emas pucat untuk garis/hairline halus */
+  --ui-ink: #1c2230;           /* tinta navy-gelap, bukan abu netral */
+  --ui-ink-soft: #5d6675;      /* sekunder dengan undertone navy */
+  --brand-dark: #16243c;       /* navy institusional — sidebar, tombol gelap, hero */
+  --emerald: #1f6b4a;          /* aksen hijau-zamrud (benar/lulus/positif) */
+  --emerald-bg: #e6f1ea;
+  --font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", Georgia, "Times New Roman", serif;
+  --bg: #f6f3ec;               /* latar kertas hangat */
   --card: #ffffff;
-  --border: #e7e7ec;
-  --green: #1d8a4e;
-  --green-bg: #e3f6ea;
+  --border: #e6e2d6;           /* garis hangat, bukan abu dingin */
+  --green: #1f6b4a;
+  --green-bg: #e6f1ea;
   --red: #d7322b;
   --red-bg: #fdeceb;
   --blue: #0071e3;
   --amber: #e8920c;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -10px rgba(0, 0, 0, 0.10);
-  --shadow-lg: 0 20px 48px -18px rgba(0, 0, 0, 0.18);
+  --shadow: 0 1px 2px rgba(28, 34, 48, 0.05), 0 10px 28px -14px rgba(22, 36, 60, 0.16);
+  --shadow-lg: 0 24px 56px -20px rgba(22, 36, 60, 0.22);
   /* permukaan komponen */
   --surface: #ffffff;
-  --surface-soft: #f5f5f7;
-  --surface-mute: #ececf0;
-  --sel: #fdf6e0;
-  --hov: #fafafa;
+  --surface-soft: #f3efe5;
+  --surface-mute: #ebe6d9;
+  --sel: #f6eed6;
+  --hov: #faf8f2;
   --warm-bg: #fdfaf1;
   --warm-border: #f1e3b5;
   --warm-ink: #8a6500;
@@ -79,6 +84,13 @@ body {
   text-rendering: optimizeLegibility;
   letter-spacing: -0.011em;
   transition: background .3s ease, color .3s ease;
+}
+
+/* Judul ekspresif: serif display (Fraunces) — memberi "rasa berjurnal" yang akademis & berkelas */
+.page-title, .score-hero .big, .auth-title, .room-card h3, .materi-content-title h3 {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.005em;
 }
 
 /* Angka rata & presisi (tabular) untuk metrik — terbaca seperti dashboard kelas atas */
@@ -294,7 +306,7 @@ main {
   margin: 0 auto;
   padding: var(--space-7) var(--space-7) var(--space-8);
 }
-.page-title { margin: 0 0 var(--space-2); font-size: var(--text-3xl); font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; }
+.page-title { margin: 0 0 var(--space-2); font-size: var(--text-3xl); font-weight: 600; letter-spacing: -0.005em; line-height: 1.12; }
 .page-sub { margin: 0 0 var(--space-6); color: var(--ui-ink-soft); font-size: var(--text-lg); max-width: 60ch; }
 
 /* ---------- Cards / grid ---------- */
@@ -361,7 +373,7 @@ input[type="text"], input[type="password"], input[type="email"], input[type="num
   transition: border-color .15s ease, box-shadow .15s ease;
 }
 textarea { resize: vertical; min-height: 70px; }
-input:focus, textarea:focus, select:focus { outline: none; border-color: var(--ui-yellow-dark); box-shadow: 0 0 0 4px rgba(245, 197, 24, .18); }
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--ui-yellow-dark); box-shadow: 0 0 0 4px rgba(194, 146, 46, .16); }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 620px) { .row2 { grid-template-columns: 1fr; } }
 
@@ -491,11 +503,22 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--u
 
 /* ---------- Result ---------- */
 .score-hero {
-  text-align: center; padding: 30px;
-  background: linear-gradient(135deg, var(--brand-dark), #2d3a52); color: #fff;
+  text-align: center; padding: 34px 30px; position: relative;
+  background: linear-gradient(150deg, #1a2b46 0%, var(--brand-dark) 55%, #0f1a2d 100%); color: #fff;
   border-radius: 16px; margin-bottom: 22px;
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: var(--shadow-lg);
 }
-.score-hero .big { font-size: 52px; font-weight: 800; color: var(--ui-yellow); }
+/* Garis emas tipis di puncak hero — detail "institusional" */
+.score-hero::before {
+  content: ""; position: absolute; left: 50%; top: 16px; transform: translateX(-50%);
+  width: 48px; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--ui-yellow), transparent);
+}
+.score-hero .big {
+  font-size: 60px; font-weight: 600; line-height: 1.05;
+  color: #f0d68a; letter-spacing: -0.01em;
+}
 .stat-row { display: flex; justify-content: center; gap: 26px; flex-wrap: wrap; margin-top: 12px; font-size: 14px; }
 .stat-row b { display: block; font-size: 22px; }
 
@@ -742,10 +765,30 @@ table.subj.subj-fit th, table.subj.subj-fit td { overflow-wrap: anywhere; }
 .theme-toggle:hover { background: rgba(255,255,255,.2); color: #fff; }
 
 /* ---------- Animasi halus ---------- */
-@keyframes cardIn { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
-.card, .score-hero, .stat-cards, .focus-banner, .record-banner { animation: cardIn .24s ease both; }
-.pkg-card { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+@keyframes cardIn { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+.card, .score-hero, .stat-cards, .focus-banner, .record-banner { animation: cardIn .34s cubic-bezier(.22,.61,.36,1) both; }
+
+/* Entrance berjenjang — kartu di grid muncul beruntun, terasa "ditata", bukan ditembak sekaligus */
+.grid > .card:nth-child(1) { animation-delay: .02s; }
+.grid > .card:nth-child(2) { animation-delay: .07s; }
+.grid > .card:nth-child(3) { animation-delay: .12s; }
+.grid > .card:nth-child(4) { animation-delay: .17s; }
+.grid > .card:nth-child(5) { animation-delay: .22s; }
+.grid > .card:nth-child(6) { animation-delay: .27s; }
+
+/* Semua kartu kini "mengangkat" saat disentuh — bukan cuma pkg-card */
+.card { transition: transform .2s cubic-bezier(.22,.61,.36,1), box-shadow .2s ease, border-color .2s ease; }
+.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); border-color: var(--gold-soft); }
+.pkg-card { transition: transform .2s cubic-bezier(.22,.61,.36,1), box-shadow .2s ease, border-color .2s ease; }
 .pkg-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--ui-yellow-dark); }
+
+/* Jawaban benar "berdenyut" lembut sekali saat ditampilkan — perayaan kecil, tidak berlebihan */
+@keyframes correctPulse {
+  0% { box-shadow: 0 0 0 0 rgba(31,107,74,0); }
+  35% { box-shadow: 0 0 0 5px rgba(31,107,74,.18); }
+  100% { box-shadow: 0 0 0 0 rgba(31,107,74,0); }
+}
+.choice.correct { animation: correctPulse .7s ease-out 1; }
 
 /* ---------- Responsif: sidebar jadi off-canvas (layar kecil) ---------- */
 @media (max-width: 880px) {
@@ -773,8 +816,8 @@ table.subj.subj-fit th, table.subj.subj-fit td { overflow-wrap: anywhere; }
 @media (max-width: 680px) {
   main { padding: var(--space-5) var(--space-4) var(--space-8); }
   .page-title { font-size: var(--text-2xl); }
-  .score-hero { padding: 22px 16px; }
-  .score-hero .big { font-size: 42px; }
+  .score-hero { padding: 26px 16px; }
+  .score-hero .big { font-size: 48px; }
   .stat-row { gap: var(--space-4); }
   .card { padding: var(--space-4); }
   .btn { padding: 8px 13px; }
@@ -850,7 +893,7 @@ body.auth-screen main { max-width: none; margin: 0; padding: 0; }
 .auth-brand-text { display: flex; flex-direction: column; line-height: 1.2; }
 .auth-brand-text strong { font-size: 16px; letter-spacing: -0.01em; }
 .auth-brand-text span { font-size: 12.5px; color: var(--ui-ink-soft); }
-.auth-title { margin: 0 0 6px; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+.auth-title { margin: 0 0 6px; font-size: 26px; font-weight: 600; letter-spacing: -0.005em; }
 .auth-sub { margin: 0 0 22px; font-size: 14px; color: var(--ui-ink-soft); }
 .auth-card .field label { font-size: 13px; }
 .auth-card input { padding: 12px 14px; border-radius: 11px; }
@@ -870,8 +913,9 @@ body.auth-screen main { max-width: none; margin: 0; padding: 0; }
 /* ---------- Aksesibilitas: kurangi animasi ---------- */
 @media (prefers-reduced-motion: reduce) {
   .timer.danger { animation: none; }
-  .toast, body, .btn, .choice, .nav-cell, .pkg-card, .theme-toggle { transition: none; }
-  .card, .score-hero, .stat-cards, .focus-banner, .record-banner, .lightbox { animation: none; }
+  .toast, body, .btn, .choice, .nav-cell, .pkg-card, .card, .theme-toggle { transition: none; }
+  .card, .score-hero, .stat-cards, .focus-banner, .record-banner, .lightbox, .choice.correct { animation: none; }
+  .card:hover, .pkg-card:hover { transform: none; }
   .materi-head::after, .bank-materi[open] > summary::after, .materi-card[open] .materi-head::after { transition: none; }
   .diff-btn { transition: none; }
 }
