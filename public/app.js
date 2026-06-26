@@ -4218,7 +4218,7 @@ async function renderAdminUsers() {
   try {
     const out = await api("/admin/users", { token: authToken() });
     card.innerHTML = "";
-    const table = el("table", { class: "subj" });
+    const table = el("table", { class: "subj subj-fit" });
     table.appendChild(el("tr", {}, [el("th", {}, "Email"), el("th", {}, "Peran"), el("th", {}, "Terdaftar"), el("th", {}, "Aksi")]));
     out.users.forEach((u) => {
       const isMe = u.email === authEmail();
