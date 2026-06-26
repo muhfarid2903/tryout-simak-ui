@@ -710,6 +710,24 @@ function el(tag, attrs = {}, children = []) {
   });
   return node;
 }
+/* Angka skor yang "hidup": naik dari 0 ke nilai akhir saat hasil muncul.
+   Menghormati prefers-reduced-motion (langsung tampilkan nilai final). */
+function bigCount(value, suffix = "") {
+  const node = el("div", { class: "big" }, "");
+  const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce) { node.textContent = String(value) + suffix; return node; }
+  node.textContent = "0" + suffix;
+  const dur = 900, t0 = performance.now();
+  function step(now) {
+    const p = Math.min(1, (now - t0) / dur);
+    const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
+    node.textContent = Math.round(value * eased) + suffix;
+    if (p < 1) requestAnimationFrame(step);
+    else node.textContent = String(value) + suffix;
+  }
+  requestAnimationFrame(step);
+  return node;
+}
 function questionsOf(pkgId) { return store.questions.filter(q => q.packageId === pkgId); }
 function pkgById(id) { return store.packages.find(p => p.id === id); }
 
@@ -2741,7 +2759,7 @@ function renderResult(r) {
 
   root.appendChild(el("div", { class: "score-hero" }, [
     el("div", {}, "Skor Tryout"),
-    el("div", { class: "big" }, String(r.score)),
+    bigCount(r.score),
     el("div", {}, `dari maksimal ${r.maxScore} · ${pct}%`),
     el("div", { class: "stat-row" }, [
       el("div", {}, [el("b", { style: "color:#86efac" }, String(r.correct)), "Benar (+4)"]),
@@ -3873,7 +3891,7 @@ function renderDiagnosticResult(d) {
   const accAll = d.answered ? Math.round((d.correct / d.answered) * 100) : 0;
   root.appendChild(el("div", { class: "score-hero" }, [
     el("div", {}, "Tes Diagnostik Selesai 📋"),
-    el("div", { class: "big" }, accAll + "%"),
+    bigCount(accAll, "%"),
     el("div", {}, `${d.correct} benar dari ${d.answered} dijawab (${d.total} soal)`),
   ]));
   if (!d.answered) {
@@ -3946,7 +3964,7 @@ function renderPracticeSummary(s) {
   const acc = ans > 0 ? Math.round((s.correct / ans) * 100) : 0;
   root.appendChild(el("div", { class: "score-hero" }, [
     el("div", {}, "Latihan Selesai · " + s.title),
-    el("div", { class: "big" }, acc + "%"),
+    bigCount(acc, "%"),
     el("div", {}, `${s.correct} benar dari ${ans} dijawab`),
     el("div", { class: "stat-row" }, [
       el("div", {}, [el("b", { style: "color:#86efac" }, String(s.correct)), "Benar"]),
