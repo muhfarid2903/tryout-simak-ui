@@ -81,10 +81,13 @@
       </header>
       <main id="app"></main>
     </div>
-  </div>
 
-  <!-- Latar gelap saat sidebar terbuka di layar kecil -->
-  <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
+    <!-- Latar gelap saat sidebar terbuka di layar kecil.
+         Harus berada DI DALAM .layout agar berbagi stacking context dengan
+         .sidebar — kalau di luar, z-index .layout (1) memerangkap sidebar (60)
+         dan backdrop (55, saudara .layout) malah menutupi serta menelan klik. -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
+  </div>
 
   <!-- Templates rendered via JS into #app -->
   <script src="app.js"></script>
