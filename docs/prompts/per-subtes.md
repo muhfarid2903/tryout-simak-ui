@@ -41,6 +41,7 @@ Daftar isi:
 3. [TOEFL ITP](#3-toefl-itp) — 2 subtes
 4. [SBMPTN (UTBK — TPS)](#4-sbmptn-utbk--tps) — 4 subtes
 5. [UKMPPD (Dokter)](#5-ukmppd-dokter) — per disiplin
+6. [Latihan IQ](#6-latihan-iq) — 4 subtes
 
 ---
 
@@ -335,3 +336,71 @@ OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing co
 === AKHIR PROMPT ===
 
 > Disiplin lain (salin nilai `subject` persis): `"Ilmu Kesehatan Anak"`, `"Bedah"`, `"Obstetri & Ginekologi"`, `"Neurologi"`, `"Psikiatri"`, `"Kardiologi"`, `"THT-KL"`, `"Mata"`, `"Kulit & Kelamin"`, `"Forensik & Medikolegal"`, `"Ilmu Kesehatan Masyarakat"`.
+
+---
+
+## 6. Latihan IQ
+
+`id` paket: **`iq-01`** · Target akhir ±100 soal (Numerik 30 · Verbal 25 · Logis 25 · Spasial 20). Tiap blok = 25 soal; ulangi blok yang sama (id tetap) sampai target. Ruangan **"Latihan IQ"** (🧠) — semua soal berbasis **teks** (tanpa gambar), pola figural dideskripsikan dengan kata/matriks angka.
+
+> Untuk paket latihan berikutnya yang **terpisah**, naikkan nomornya: `id` → `iq-02` dan `name` → `… Paket 2` (lihat [Aturan penamaan paket](#aturan-penamaan-paket-kapan-menyatu-vs-terpisah)).
+
+### 6a. Penalaran Numerik — 25 soal
+
+=== MULAI PROMPT ===
+Kamu psikometris ahli penyusun **tes IQ** (culture-fair, gaya Cattell/Raven numerik). Buat **25 soal** subtes **"Penalaran Numerik"** sebagai **JSON valid** — mengukur kemampuan menemukan POLA, bukan hafalan; tiap soal punya **satu pola yang benar-benar deterministik**.
+Output objek tunggal persis:
+{
+  "packages": [{ "id": "iq-01", "name": "Latihan IQ Paket 1", "program": "Latihan IQ", "mode": "sections", "durationMin": 80, "sectionMinutes": { "Penalaran Numerik": 20, "Penalaran Verbal": 20, "Penalaran Logis": 20, "Penalaran Spasial": 20 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "questions": [ /* tepat 25 objek soal */ ]
+}
+Tiap soal: { "packageId": "iq-01", "subject": "Penalaran Numerik", "subtopic": <salah satu di bawah, persis>, "difficulty": 1|2|3, "text", "options": [5 string, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat — sebut pola/aturannya", "optExplain": [5 sejajar — distraktor sebut pola keliru yang menggoda, mis. salah operasi/loncatan], "steps": [langkah menemukan pola] }. JANGAN sertakan `id`/`image`.
+Sub-topik (pakai persis): `"Deret Angka"`, `"Deret Bertingkat & Berselang"`, `"Pola Operasi (Matriks Angka)"`, `"Analogi Numerik"`, `"Penalaran Aritmetika Cepat"`. Sebar ke-5 sub-topik.
+Kesulitan: ~30% Mudah(1) / 50% Sedang(2) / 20% Sulit(3). **Verifikasi tiap pola** agar hanya satu jawaban yang konsisten; hindari deret ambigu (yang muat banyak rumus).
+OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing comma. Hasilkan **tepat 25 soal**.
+=== AKHIR PROMPT ===
+
+### 6b. Penalaran Verbal — 25 soal
+
+=== MULAI PROMPT ===
+Kamu psikometris ahli penyusun **tes IQ verbal**. Buat **25 soal** subtes **"Penalaran Verbal"** sebagai **JSON valid** — mengukur kemampuan mengenali HUBUNGAN & KLASIFIKASI kata, bukan kosakata langka.
+Output objek tunggal persis:
+{
+  "packages": [{ "id": "iq-01", "name": "Latihan IQ Paket 1", "program": "Latihan IQ", "mode": "sections", "durationMin": 80, "sectionMinutes": { "Penalaran Numerik": 20, "Penalaran Verbal": 20, "Penalaran Logis": 20, "Penalaran Spasial": 20 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "questions": [ /* tepat 25 objek soal */ ]
+}
+Tiap soal: { "packageId": "iq-01", "subject": "Penalaran Verbal", "subtopic": <salah satu di bawah, persis>, "difficulty": 1|2|3, "text", "options": [5 string, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat — sebut hubungannya", "optExplain": [5 sejajar — distraktor sebut hubungan yang keliru], "steps": [] }. JANGAN sertakan `id`/`image`.
+Sub-topik (pakai persis): `"Analogi Kata"`, `"Pengelompokan / Pengecualian (Odd One Out)"`, `"Hubungan Sebab–Akibat"`, `"Padanan & Lawan Konsep"`, `"Penalaran Kategori"`. Sebar ke-5 sub-topik. Pakai kata umum (hindari istilah teknis langka).
+Kesulitan: ~30% Mudah(1) / 50% Sedang(2) / 20% Sulit(3). Hanya satu jawaban yang hubungannya paling tepat & tunggal; sisanya hubungan yang serupa tapi tak sepadan.
+OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing comma. Hasilkan **tepat 25 soal**.
+=== AKHIR PROMPT ===
+
+### 6c. Penalaran Logis — 25 soal
+
+=== MULAI PROMPT ===
+Kamu psikometris ahli penyusun **tes IQ penalaran logis/analitis**. Buat **25 soal** subtes **"Penalaran Logis"** sebagai **JSON valid** — deduksi dari premis, urutan, posisi, dan kondisi.
+Output objek tunggal persis:
+{
+  "packages": [{ "id": "iq-01", "name": "Latihan IQ Paket 1", "program": "Latihan IQ", "mode": "sections", "durationMin": 80, "sectionMinutes": { "Penalaran Numerik": 20, "Penalaran Verbal": 20, "Penalaran Logis": 20, "Penalaran Spasial": 20 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "questions": [ /* tepat 25 objek soal */ ]
+}
+Tiap soal: { "packageId": "iq-01", "subject": "Penalaran Logis", "subtopic": <salah satu di bawah, persis>, "difficulty": 1|2|3, "text", "options": [5 string, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat", "optExplain": [5 sejajar — distraktor sebut cacat nalar (membalik implikasi, overgeneralisasi, urutan salah)], "steps": [langkah penalaran] }. JANGAN sertakan `id`/`image`.
+Sub-topik (pakai persis): `"Silogisme & Deduksi"`, `"Penalaran Analitis (Urutan & Posisi)"`, `"Logika Jika–Maka"`, `"Penalaran Kondisional (Teka-teki)"`, `"Pola Kesimpulan"`. Sebar ke-5 sub-topik.
+Kesulitan: ~30% Mudah(1) / 50% Sedang(2) / 20% Sulit(3). Hanya satu opsi yang benar-benar mengikuti premis; tiap soal punya solusi unik & dapat diverifikasi.
+OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing comma. Hasilkan **tepat 25 soal**.
+=== AKHIR PROMPT ===
+
+### 6d. Penalaran Spasial — 25 soal
+
+=== MULAI PROMPT ===
+Kamu psikometris ahli penyusun **tes IQ spasial/figural** yang disajikan **murni dalam teks** (tanpa gambar). Buat **25 soal** subtes **"Penalaran Spasial"** sebagai **JSON valid**. Karena tanpa gambar, **deskripsikan figur/pola dengan kata atau simbol** (mis. matriks 3×3 dari simbol, rotasi/cermin yang dijelaskan kata).
+Output objek tunggal persis:
+{
+  "packages": [{ "id": "iq-01", "name": "Latihan IQ Paket 1", "program": "Latihan IQ", "mode": "sections", "durationMin": 80, "sectionMinutes": { "Penalaran Numerik": 20, "Penalaran Verbal": 20, "Penalaran Logis": 20, "Penalaran Spasial": 20 }, "shuffleQuestions": true, "shuffleOptions": true }],
+  "questions": [ /* tepat 25 objek soal */ ]
+}
+Tiap soal: { "packageId": "iq-01", "subject": "Penalaran Spasial", "subtopic": <salah satu di bawah, persis>, "difficulty": 1|2|3, "text": "<deskripsi figur/pola jelas; pakai \\n untuk baris matriks>", "options": [5 string, A–E], "answer": "A"–"E", "pembahasan": "1–3 kalimat — sebut transformasinya", "optExplain": [5 sejajar — distraktor sebut transformasi keliru], "steps": [] }. JANGAN sertakan `id`/`image`.
+Sub-topik (pakai persis): `"Matriks Pola (Raven-style)"`, `"Rotasi & Pencerminan"`, `"Deret Bentuk"`, `"Pola Posisi & Arah"`, `"Penalaran Simbol"`. Sebar ke-5 sub-topik. Gunakan simbol yang jelas (▲ ● ■ ↑ → dst.) agar tak ambigu.
+Kesulitan: ~30% Mudah(1) / 50% Sedang(2) / 20% Sulit(3). Pastikan deskripsi cukup sehingga jawaban tunggal & dapat dipikirkan tanpa melihat gambar.
+OUTPUT: HANYA JSON valid — tanpa pagar ```, tanpa teks lain, tanpa trailing comma. Hasilkan **tepat 25 soal**.
+=== AKHIR PROMPT ===
