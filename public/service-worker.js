@@ -1,6 +1,6 @@
 /* Service worker Tryout SIMAK UI — cache app-shell agar bisa dibuka offline.
    Naikkan CACHE_VERSION tiap kali aset inti berubah agar klien mengambil versi baru. */
-const CACHE_VERSION = "tryout-simak-v1";
+const CACHE_VERSION = "tryout-simak-v2";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -39,7 +39,27 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Aset statis: sajikan dari cache, perbarui di latar belakang (stale-while-revalidate).
+  // App-shell (HTML/JS/CSS) HARUS sinkron dengan index.html (yang selalu network-first).
+  // Maka shell pun network-first: ambil versi terbaru saat online, fallback ke cache saat offline.
+  // (Cache-first di sini pernah menyajikan app.js/style.css basi yang tak cocok dengan HTML baru
+  //  → UI tampil tapi tak bisa di-tap. Lihat README/catatan.)
+  const isShell = /\.(?:js|css)$|\/index\.html$|\/manifest\.webmanifest$/.test(url.pathname) || url.pathname === "/";
+  if (isShell) {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  // Aset lain (gambar/ikon/font): sajikan dari cache, perbarui di latar belakang (stale-while-revalidate).
   event.respondWith(
     caches.match(req).then((cached) => {
       const network = fetch(req)
