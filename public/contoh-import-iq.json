@@ -1,0 +1,117 @@
+{
+  "packages": [
+    {
+      "id": "iq-contoh",
+      "name": "Contoh Latihan IQ",
+      "program": "Latihan IQ",
+      "mode": "sections",
+      "durationMin": 30,
+      "sectionMinutes": {
+        "Penalaran Numerik": 8,
+        "Penalaran Verbal": 7,
+        "Penalaran Logis": 8,
+        "Penalaran Spasial": 7
+      },
+      "shuffleQuestions": true,
+      "shuffleOptions": true
+    }
+  ],
+  "questions": [
+    {
+      "packageId": "iq-contoh",
+      "subject": "Penalaran Numerik",
+      "subtopic": "Deret Angka",
+      "difficulty": 1,
+      "text": "Lanjutkan deret berikut: 2, 4, 8, 16, ...",
+      "options": ["24", "30", "32", "20", "18"],
+      "answer": "C",
+      "pembahasan": "Tiap suku dikali 2. Setelah 16 adalah 32. Jawaban: C.",
+      "optExplain": ["Keliru — menambah 8 (pola aditif), bukan mengali 2.", "Keliru — tidak ada pola tetap menuju 30.", "Tepat — setiap suku dikali 2: 16 × 2 = 32.", "Keliru — menambah 4, padahal selisih membesar.", "Keliru — justru lebih kecil dari suku sebelumnya."],
+      "steps": ["Cari rasio: 4/2 = 2, 8/4 = 2, 16/8 = 2.", "Pola = kali 2.", "16 × 2 = 32."]
+    },
+    {
+      "packageId": "iq-contoh",
+      "subject": "Penalaran Numerik",
+      "subtopic": "Deret Bertingkat & Berselang",
+      "difficulty": 2,
+      "text": "Lanjutkan deret berikut: 3, 4, 6, 9, 13, ...",
+      "options": ["16", "17", "18", "20", "15"],
+      "answer": "C",
+      "pembahasan": "Selisih bertambah 1 tiap langkah: +1, +2, +3, +4, +5. 13 + 5 = 18. Jawaban: C.",
+      "optExplain": ["Keliru — menambah 3, padahal selisih berikutnya 5.", "Keliru — menambah 4, bukan 5.", "Tepat — selisih naik berurutan, +5 menghasilkan 18.", "Keliru — melompat terlalu jauh (+7).", "Keliru — selisih tidak menurun."],
+      "steps": ["Selisih: 1, 2, 3, 4.", "Selisih berikutnya = 5.", "13 + 5 = 18."]
+    },
+    {
+      "packageId": "iq-contoh",
+      "subject": "Penalaran Verbal",
+      "subtopic": "Analogi Kata",
+      "difficulty": 1,
+      "text": "DOKTER : RUMAH SAKIT = GURU : ...",
+      "options": ["Buku", "Sekolah", "Murid", "Pelajaran", "Seragam"],
+      "answer": "B",
+      "pembahasan": "Hubungan profesi : tempat bekerja. Dokter bekerja di rumah sakit, guru di sekolah. Jawaban: B.",
+      "optExplain": ["Keliru — buku adalah alat, bukan tempat kerja.", "Tepat — sekolah adalah tempat guru bekerja.", "Keliru — murid adalah objek yang dilayani, bukan tempat.", "Keliru — pelajaran adalah materi, bukan tempat.", "Keliru — seragam adalah atribut, bukan tempat kerja."],
+      "steps": []
+    },
+    {
+      "packageId": "iq-contoh",
+      "subject": "Penalaran Verbal",
+      "subtopic": "Pengelompokan / Pengecualian (Odd One Out)",
+      "difficulty": 2,
+      "text": "Manakah yang TIDAK termasuk kelompok yang sama?",
+      "options": ["Mawar", "Melati", "Anggrek", "Bambu", "Tulip"],
+      "answer": "D",
+      "pembahasan": "Mawar, melati, anggrek, dan tulip adalah bunga; bambu adalah jenis rumput/pohon, bukan bunga. Jawaban: D.",
+      "optExplain": ["Keliru — mawar adalah bunga.", "Keliru — melati adalah bunga.", "Keliru — anggrek adalah bunga.", "Tepat — bambu bukan bunga, beda kategori.", "Keliru — tulip adalah bunga."],
+      "steps": []
+    },
+    {
+      "packageId": "iq-contoh",
+      "subject": "Penalaran Logis",
+      "subtopic": "Silogisme & Deduksi",
+      "difficulty": 2,
+      "text": "Semua mamalia bernapas dengan paru-paru. Paus adalah mamalia. Maka ...",
+      "options": ["Paus bernapas dengan insang", "Paus bernapas dengan paru-paru", "Sebagian mamalia bukan paus", "Semua yang berparu-paru adalah paus", "Paus bukan mamalia"],
+      "answer": "B",
+      "pembahasan": "Dari kedua premis, kesimpulan sah: paus bernapas dengan paru-paru. Jawaban: B.",
+      "optExplain": ["Keliru — bertentangan dengan premis pertama.", "Tepat — kesimpulan deduktif yang sah dari kedua premis.", "Keliru — benar secara fakta tapi tidak mengikuti dari premis.", "Keliru — membalik pernyataan universal (tidak sah).", "Keliru — bertentangan dengan premis kedua."],
+      "steps": ["Premis: mamalia → paru-paru.", "Paus = mamalia.", "Maka paus → paru-paru."]
+    },
+    {
+      "packageId": "iq-contoh",
+      "subject": "Penalaran Logis",
+      "subtopic": "Penalaran Analitis (Urutan & Posisi)",
+      "difficulty": 2,
+      "text": "Ani lebih tinggi dari Budi. Citra lebih pendek dari Budi. Siapa yang paling tinggi?",
+      "options": ["Budi", "Citra", "Ani", "Tidak dapat ditentukan", "Sama tinggi"],
+      "answer": "C",
+      "pembahasan": "Urutan tinggi: Ani > Budi > Citra. Maka Ani paling tinggi. Jawaban: C.",
+      "optExplain": ["Keliru — Budi di tengah, bukan tertinggi.", "Keliru — Citra justru paling pendek.", "Tepat — Ani > Budi > Citra, jadi Ani tertinggi.", "Keliru — urutan dapat ditentukan penuh dari premis.", "Keliru — premis menyatakan perbedaan tinggi."],
+      "steps": ["Ani > Budi.", "Budi > Citra.", "Maka Ani > Budi > Citra."]
+    },
+    {
+      "packageId": "iq-contoh",
+      "subject": "Penalaran Spasial",
+      "subtopic": "Deret Bentuk",
+      "difficulty": 1,
+      "text": "Perhatikan deret simbol: ▲ ▲▲ ▲▲▲ ...\nBerapa banyak segitiga pada pola berikutnya?",
+      "options": ["2", "3", "4", "5", "6"],
+      "answer": "C",
+      "pembahasan": "Jumlah segitiga bertambah satu tiap langkah: 1, 2, 3, lalu 4. Jawaban: C.",
+      "optExplain": ["Keliru — itu pola ke-2, bukan berikutnya.", "Keliru — itu pola ke-3 yang sudah tampil.", "Tepat — pola berikutnya bertambah jadi 4 segitiga.", "Keliru — melompati satu langkah.", "Keliru — pertambahan hanya satu per langkah."],
+      "steps": []
+    },
+    {
+      "packageId": "iq-contoh",
+      "subject": "Penalaran Spasial",
+      "subtopic": "Pola Posisi & Arah",
+      "difficulty": 2,
+      "text": "Sebuah panah menunjuk ke atas (↑). Bila diputar 90° searah jarum jam, ke arah mana panah menunjuk?",
+      "options": ["Ke atas (↑)", "Ke kanan (→)", "Ke bawah (↓)", "Ke kiri (←)", "Tetap ke atas"],
+      "answer": "B",
+      "pembahasan": "Putaran 90° searah jarum jam mengubah arah atas menjadi kanan. Jawaban: B.",
+      "optExplain": ["Keliru — itu posisi sebelum diputar.", "Tepat — 90° searah jarum jam: atas → kanan.", "Keliru — itu putaran 180°.", "Keliru — itu putaran 90° berlawanan jarum jam.", "Keliru — putaran pasti mengubah arah."],
+      "steps": []
+    }
+  ]
+}

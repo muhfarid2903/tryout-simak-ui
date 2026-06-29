@@ -10,7 +10,7 @@ const OPT_KEYS = ["A", "B", "C", "D", "E"];
 const SCORE = { correct: 4, wrong: -1, empty: 0 };
 const PRESET_SUBJECTS = ["Kemampuan Verbal", "Kemampuan Kuantitatif", "Kemampuan Penalaran", "Bahasa Inggris"];
 // Program tryout yang didukung (kategori di atas paket). Urutan = urutan tampil di filter.
-const PROGRAMS = ["SIMAK UI", "SIMAK UI Pascasarjana", "TOEFL", "SBMPTN", "UKMPPD (Dokter)"];
+const PROGRAMS = ["SIMAK UI", "SIMAK UI Pascasarjana", "TOEFL", "SBMPTN", "UKMPPD (Dokter)", "Latihan IQ"];
 const PROGRAM_OTHER = "Lainnya"; // label untuk paket tanpa program (data lama / impor)
 function programOf(p) { return (p && p.program) ? p.program : PROGRAM_OTHER; }
 
@@ -22,6 +22,7 @@ const ROOMS = {
   "TOEFL":                 { icon: "🌐", blurb: "Structure, Written Expression & Reading",   features: { diagnostic: false } },
   "SBMPTN":                { icon: "📚", blurb: "Tes Potensi Skolastik (UTBK)",               features: { diagnostic: true } },
   "UKMPPD (Dokter)":       { icon: "🩺", blurb: "Ilmu klinik untuk uji kompetensi dokter",    features: { diagnostic: false } },
+  "Latihan IQ":            { icon: "🧠", blurb: "Latihan penalaran untuk mengasah IQ",        features: { diagnostic: true } },
 };
 const ROOM_OTHER = { icon: "📦", blurb: "Paket lain yang belum dikategorikan", features: { diagnostic: true } };
 function roomConfig(prog) { return ROOMS[prog] || ROOM_OTHER; }
